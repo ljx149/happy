@@ -15,13 +15,16 @@ type Route =
   | { page: 'workbench' }
   | { page: 'login' };
 
-function route(): Route {
-  const { pathname, hash } = window.location;
-  if (pathname === '/terminal/connect') return { page: 'terminal-connect', key: hash.replace('#key=', '') || undefined };
+export function parseRoute(pathname: string, hash: string): Route {
   if (hash === '#restore') return { page: 'restore' };
-  if (hash.startsWith('#session/')) return { page: 'session-detail', id: hash.split('/')[2] };
+  if (hash.startsWith('#session/')) return { page: 'session-detail', id: hash.split('/')[1] };
   if (hash === '#home') return { page: 'workbench' };
+  if (pathname === '/terminal/connect') return { page: 'terminal-connect', key: hash.replace('#key=', '') || undefined };
   return { page: 'login' };
+}
+
+function route(): Route {
+  return parseRoute(window.location.pathname, window.location.hash);
 }
 
 export default function App() {
