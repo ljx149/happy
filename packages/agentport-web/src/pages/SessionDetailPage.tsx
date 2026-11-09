@@ -13,6 +13,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
   const [sendError, setSendError] = useState('');
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [legacy, setLegacy] = useState(false);
   const [draft, setDraft] = useState('');
   const [refresh, setRefresh] = useState<() => void>();
   const [title, setTitle] = useState(id.slice(0, 8));
@@ -37,6 +38,8 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
         if (!key) {
           // legacy session — visible in list, not supported here.
           setTitle('此会话使用 legacy 加密，暂不支持。');
+          setLegacy(true);
+          setLoaded(true);
           return;
         }
         while (active && queued) {
@@ -108,16 +111,17 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
     </header>
     <div className="thread" aria-label="会话消息" aria-live="polite">
       {syncError && <p role="alert" className="pending">{syncError}</p>}
-      {!loaded && !syncError && <p role="status">正在同步会话…</p>}
-      {loaded && !messages.length && <p>暂无消息。</p>}
+      {!loaded && !syncError && !legacy && <p role="status">正在同步会话…</p>}
+      {loaded && legacy && <p role="status">此会话由旧版设备创建，使用 legacy 加密，当前浏览器客户端暂不支持读取或发送。可在工作台列表中查看，但无法在此对话。</p>}
+      {loaded && !legacy && !messages.length && <p>暂无消息。</p>}
       {messages.map(message => <div className="message" key={message.id} data-author={message.author}>
         <strong>{message.author}</strong>{message.text}
       </div>)}
     </div>
     {sendError && <p role="alert" className="pending">{sendError}</p>}
-    <form className="composer" onSubmit={send}>
+    {!legacy && <form className="composer" onSubmit={send}>
       <textarea aria-label="消息" rows={1} value={draft} onChange={event => setDraft(event.target.value)} placeholder="发送指令…" />
       <button className="primary" disabled={busy || !loaded || !draft.trim()}>发送 ↑</button>
-    </form>
+    </form>}
   </section>;
 }

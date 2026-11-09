@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在 `packages/agentport-web/` 用 React + TypeScript + Vite 实现浏览器客户端，打通 V2 终端配对、账户创建/恢复、dataKey 会话解密与双向消息收发，不实现 legacy 会话回退。
+**Goal:** 在 `packages/agentport-web/` 用 React + TypeScript + Vite 实现浏览器客户端，打通 V2 终端配对、账户创建/恢复、dataKey 会话解密与双向消息收发。第一阶段只验收 dataKey，遇 legacy 会话提示"暂不支持"，禁止静默回退。
 
-**Architecture:** 浏览器持有 32 字节 masterSecret（恢复凭据），经 HMAC-SHA512 密钥树派生 content 密钥（`deriveKey(master, 'Happy EnCoder', ['content'])` → 32 字节），再做 SHA-512 取前 32 字节作 X25519 secret，生成 box 公钥对。V2 配对时把 `0x00 || contentPub` 用临时公钥 box 加密发给 CLI。CLI 创建会话时生成随机 32 字节 AES key，box 加密到 contentPub 后以 `0x00 || box` 格式存为 `dataEncryptionKey`。浏览器 boxDecrypt 得到原始 AES key，直接用它做 AES-256-GCM 解密消息（不做第二层 deriveKey）。消息读写走 V3 路由（`/v3/sessions/:id/messages`）。所有加密用 Web Crypto（AES-GCM、HMAC-SHA512、SHA-512）+ tweetnacl（box、sign），不碰 node:crypto。
+**Architecture:** 浏览器持有 32 字节 masterSecret（恢复凭据），经 HMAC-SHA512 密钥树派生 content 密钥（`deriveKey(master, 'Happy EnCoder', ['content'])`），**再做 SHA-512 取前 32 字节作 X25519 secret**（与 CLI `libsodiumPublicKeyFromSecretKey` 和 Android `Sodium.boxSeedKeypair` 一致），生成 box 公钥对。V2 配对时把 `0x00 || contentPub` 用 box 加密到 CLI 的临时公钥。CLI 创建会话时生成随机 32 字节 AES key，box 加密到 contentPub 后以 `0x00 || box` 格式存为 `dataEncryptionKey`。浏览器 boxDecrypt 得到 AES key 后，**直接用该 key 做 AES-256-GCM 解密消息（不做第二层 deriveKey）**。消息读写走 V3 路由（`/v3/sessions/:id/messages`），会话列表走 `/v1/sessions`。所有加密用 Web Crypto（AES-GCM、HMAC-SHA512、SHA-512）+ tweetnacl（box、sign），不碰 node:crypto。
 
 **Tech Stack:** React 18, TypeScript, Vite 5, socket.io-client, tweetnacl, happy-wire（Zod schema，浏览器可直接 import），Web Crypto API。
 
@@ -18,19 +18,11 @@
 - 遇 legacy 会话（`dataEncryptionKey === null`）显示"暂不支持"，禁止静默回退到 tweetnacl.secretbox
 - 恢复凭据、私钥、token 不得出现在日志、录屏或提交历史中
 - 保留现有 `style.css` 的 Xcoder 视觉，不引入新设计系统
-- 消息读写走 `/v3/sessions/:id/messages`，会话列表走 `/v1/sessions`
-- 内容密钥派生：`deriveKey(master, 'Happy EnCoder', ['content'])` → SHA-512 → 取前 32 字节 → X25519（必须两步，不能直接 `fromSecretKey`）
-- 消息 AES-GCM 直接用 box 解封后的原始 AES 密钥，不做第二层 deriveKey
-- 配对状态查询返回 `not_found` 时显示"请求不存在或已过期"；CLI 端轮询超时是客户端行为，浏览器不应无限等待
-
-## Review Focus
-
-- 恢复凭据在 IndexedDB 中的存储：刷新页面后账户不能静默消失，也不能被其他用户读走——验证 IndexedDB 隔离
-- `/terminal/connect` 链接过期后用户看到的状态：请求不存在（`not_found`）与 CLI 端超时是两个不同场景，浏览器应显示"请求不存在或已过期，请在电脑上重新运行 auth login"，不循环重试
-- Socket.IO 断线重连：浏览器与 CLI 在同一 session 上同时在线时，消息不能丢失也不能重复——需要验证 seq 去重
-- 并发双浏览器：同一账户在两个浏览器同时打开，消息必须双向同步且加密格式一致
-- 浏览器 AES-GCM 与 CLI Node crypto 的互通：nonce 和 authTag 拼接顺序必须严格一致（version(1) || nonce(12) || ct || tag(16)）
-- 内容密钥 SHA-512 取前 32 字节：不能跳过，不能直接 `tweetnacl.box.keyPair.fromSecretKey(contentKey)`
+- **消息读写走 `/v3/sessions/:id/messages`**，会话列表走 `/v1/sessions`
+- **内容密钥派生**：`deriveKey(master, 'Happy EnCoder', ['content'])` → SHA-512 → 取前 32 字节 → X25519（必须两步，不能直接 `fromSecretKey`）
+- **消息 AES-GCM 直接用 box 解封后的原始 AES 密钥**，不做第二层 deriveKey（`deriveKey(aesKey, 'Happy Blobs', ['session'])` 是 CLI `getBlobKey()` 给附件用的，不是消息用的）
+- **配对不可用与服务端强制过期分开**：服务端无 age 检查，`not_found` 只表示请求不存在。浏览器收到 `not_found` 显示"请求不存在或已过期，请在电脑上重新运行 auth login"，不循环重试。CLI 端轮询超时是客户端行为，与 `not_found` 是两个独立场景。
+- **Reviewer 三道验收卡点**：Task 2–4 验证官方派生向量和真实 CLI V2 配对；Task 5–6 验证 CLI 与浏览器双向加解密及 V3 消息收发；Task 7 用干净配置跑完端到端并在第二个浏览器恢复同一会话。其余任务可连续执行。
 
 ---
 
@@ -208,7 +200,7 @@ git commit -m "feat(agentport-web): scaffold Vite+React+TS with Xcoder theme and
 
 ---
 
-### Task 2: 密码学基元 — base64、deriveKey、AES-GCM、box
+### Task 2: 密码学基元 — base64、deriveKey、SHA-512→X25519、AES-GCM、box
 
 **Files:**
 - Create: `packages/agentport-web/src/lib/base64.ts`
@@ -222,8 +214,7 @@ git commit -m "feat(agentport-web): scaffold Vite+React+TS with Xcoder theme and
 - Produces: `encodeBase64(buf: Uint8Array, variant?: 'base64'|'base64url'): string`
 - Produces: `decodeBase64(s: string, variant?: 'base64'|'base64url'): Uint8Array`
 - Produces: `deriveKey(master: Uint8Array, usage: string, path: string[]): Promise<Uint8Array>`（HMAC-SHA512 密钥树，与 CLI `utils/deriveKey.ts` 语义相同）
-- Produces: `sha512(data: Uint8Array): Promise<Uint8Array>`（Web Crypto SHA-512）
-- Produces: `boxKeyPairFromSeed(seed: Uint8Array): tweetnacl.BoxKeyPair`（先 SHA-512(seed) 取前 32 字节作 X25519 secret，再生成公钥对——与 CLI `libsodiumPublicKeyFromSecretKey` + Android `Sodium.boxSeedKeypair` 一致）
+- Produces: `boxKeyPairFromSeed(seed: Uint8Array): tweetnacl.BoxKeyPair`（**先 SHA-512(seed) 取前 32 字节作 X25519 secret，再生成公钥对**——与 CLI `libsodiumPublicKeyFromSecretKey` + Android `Sodium.boxSeedKeypair` 一致）
 - Produces: `encryptDataKey(data: unknown, aesKey: Uint8Array): Promise<Uint8Array>`（AES-256-GCM，bundle = version(1)=0 || nonce(12) || ct || tag(16)）
 - Produces: `decryptDataKey(bundle: Uint8Array, aesKey: Uint8Array): Promise<any|null>`
 - Produces: `boxEncrypt(data: Uint8Array, recipientPub: Uint8Array): { bundle: Uint8Array; ephemeralPub: Uint8Array }`（tweetnacl.box，与 CLI `libsodiumEncryptForPublicKey` 格式一致）
@@ -250,35 +241,32 @@ expect(decodeBase64(b64url, 'base64url')).toEqual(new Uint8Array([0xfb, 0xff, 0x
 
 - [ ] **Step 4: 运行测试确认通过**
 
-- [ ] **Step 5: 写 deriveKey.test.ts 失败测试**
+- [ ] **Step 5: 写 deriveKey.test.ts 失败测试（固定向量）**
 
 ```ts
 import { deriveKey, boxKeyPairFromSeed } from './deriveKey';
-import { encodeBase64 } from './base64';
-// 固定向量（由锁定版本 CLI 的官方函数生成）
+// 固定向量（由锁定版本 CLI 的官方函数生成，master = 32 字节全 0xAB）
 const ms = new Uint8Array(32).fill(0xab);
 const key = await deriveKey(ms, 'Happy EnCoder', ['content']);
-// 期望 content key 前 8 字节为 f30653dfd9862bb0（官方实现）
-expect(Array.from(key.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')).toBe('f30653dfd9862bb0');
+// 官方向量：content key = f30653dfd9862bb061fa8628134c672245db078e2ddba93508e856b5b762802b
 expect(key).toHaveLength(32);
-// 不同 usage 产生不同 key
-const other = await deriveKey(ms, 'Other Usage', ['content']);
-expect(Array.from(key.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')).not.toBe(
-  Array.from(other.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')
-);
+expect(Array.from(key).map(b => b.toString(16).padStart(2, '0')).join(''))
+  .toBe('f30653dfd9862bb061fa8628134c672245db078e2ddba93508e856b5b762802b');
 // boxKeyPairFromSeed：先 SHA-512 取前 32 字节再 X25519
 const kp = boxKeyPairFromSeed(key);
 // 官方向量：contentPub = 1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c
-expect(Array.from(kp.publicKey).map(b => b.toString(16).padStart(2, '0')).join('')).toBe(
-  '1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c'
-);
+expect(Array.from(kp.publicKey).map(b => b.toString(16).padStart(2, '0')).join(''))
+  .toBe('1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c');
+// 不同 usage 产生不同 key
+const other = await deriveKey(ms, 'Other Usage', ['content']);
+expect(other).not.toEqual(key);
 ```
 
 - [ ] **Step 6: 运行测试确认失败**
 
 - [ ] **Step 7: 实现 deriveKey.ts**
 
-HMAC-SHA512 密钥树 + `boxKeyPairFromSeed`（SHA-512 → 取前 32 → `tweetnacl.box.keyPair.fromSecretKey`）。
+HMAC-SHA512 密钥树（Web Crypto）+ `boxKeyPairFromSeed`（**SHA-512(seed) → 取前 32 字节 → `tweetnacl.box.keyPair.fromSecretKey`**）。
 
 - [ ] **Step 8: 运行测试确认通过**
 
@@ -286,27 +274,27 @@ HMAC-SHA512 密钥树 + `boxKeyPairFromSeed`（SHA-512 → 取前 32 → `tweetn
 
 ```ts
 import { encryptDataKey, decryptDataKey, boxEncrypt, boxDecrypt } from './encryptDataKey';
-// 固定向量（官方 CLI encryptWithDataKey 生成）
+// 固定向量（官方 CLI encryptWithDataKey 生成，aesKey = 32 字节全 0xCD）
 const aesKey = new Uint8Array(32).fill(0xcd);
 const msg = { role: 'user', content: { type: 'text', text: 'vector-test' } };
 const bundle = await encryptDataKey(msg, aesKey);
-// 期望 bundle 前 8 字节为 00ef4b5cffaf9682（官方实现）
-expect(Array.from(bundle.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')).toBe('00ef4b5cffaf9682');
+// 官方向量：AES_MSG_BUNDLE 前 8 字节 = 00ef4b5cffaf9682
 expect(bundle[0]).toBe(0); // version byte
+expect(Array.from(bundle.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(''))
+  .toBe('00ef4b5cffaf9682');
+expect(bundle.length).toBe(91); // 官方向量长度
 const decrypted = await decryptDataKey(bundle, aesKey);
 expect(decrypted).toEqual(msg);
 const wrongKey = new Uint8Array(32).fill(0x11);
 expect(await decryptDataKey(bundle, wrongKey)).toBeNull();
-// boxEncrypt 固定向量
+// boxEncrypt 格式测试（不验证与 CLI 的互通，互通在 Task 7 e2e）
 import tweetnacl from 'tweetnacl';
-const ephSec = new Uint8Array(32).fill(0x11);
-const eph = tweetnacl.box.keyPair.fromSecretKey(ephSec);
-const contentPub = tweetnacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(0x42)).publicKey;
-// 注意：这里直接用 0x42 填的 keypair 只是格式测试，不验证与 CLI 的互通
-const { bundle: boxBundle } = boxEncrypt(new Uint8Array([0x00, ...new Uint8Array(32).fill(0x42)]), contentPub);
+const recipientKp = tweetnacl.box.keyPair();
+const data = new Uint8Array([0x00, ...new Uint8Array(32).fill(0x42)]);
+const { bundle: boxBundle } = boxEncrypt(data, recipientKp.publicKey);
 expect(boxBundle.length).toBe(32 + 24 + 33 + 16);
-const dec = boxDecrypt(boxBundle, eph.secretKey);
-expect(dec).toEqual(new Uint8Array([0x00, ...new Uint8Array(32).fill(0x42)]));
+const dec = boxDecrypt(boxBundle, recipientKp.secretKey);
+expect(dec).toEqual(data);
 ```
 
 - [ ] **Step 10: 运行测试确认失败**
@@ -321,8 +309,10 @@ AES-GCM bundle = version(1)=0 || nonce(12) || ct || tag(16)。boxEncrypt 直接�
 
 ```bash
 git add packages/agentport-web/src/lib/
-git commit -m "feat(agentport-web): crypto primitives — base64, HMAC-SHA512 deriveKey, boxKeyPairFromSeed, AES-GCM dataKey, tweetnacl box"
+git commit -m "feat(agentport-web): crypto primitives — base64, HMAC-SHA512 deriveKey, boxKeyPairFromSeed (SHA-512→X25519), AES-GCM dataKey, tweetnacl box"
 ```
+
+**Reviewer 卡点 1 的验证项**：`boxKeyPairFromSeed` 的官方派生向量（`1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c`）必须通过。Task 4 的真实 CLI V2 配对在 Task 7 e2e 验证。
 
 ---
 
@@ -340,7 +330,7 @@ git commit -m "feat(agentport-web): crypto primitives — base64, HMAC-SHA512 de
 - Produces: `recoverAccount(masterSecret: Uint8Array): Promise<{token: string}>`（同上）
 - Produces: `masterSecretToRecoveryCredential(ms: Uint8Array): string`（base64url）
 - Produces: `recoveryCredentialToMasterSecret(s: string): Uint8Array|null`（非 32 字节返回 null）
-- Produces: `deriveContentKeyPair(masterSecret: Uint8Array): Promise<tweetnacl.BoxKeyPair>`（deriveKey → SHA-512 → X25519，与 Task 2 的 boxKeyPairFromSeed 相同路径）
+- Produces: `deriveContentKeyPair(masterSecret: Uint8Array): Promise<tweetnacl.BoxKeyPair>`（`deriveKey` → `boxKeyPairFromSeed`，与 Task 2 相同路径）
 - Produces: `Account` 类型：`{ masterSecret: Uint8Array; token: string }`
 - Consumes: Task 2 的 base64, deriveKey, boxKeyPairFromSeed; tweetnacl.sign
 
@@ -354,9 +344,8 @@ expect(recoveryCredentialToMasterSecret(cred)).toEqual(ms);
 expect(recoveryCredentialToMasterSecret('too-short')).toBeNull();
 // 官方向量：contentPub = 1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c
 const kp = await deriveContentKeyPair(ms);
-expect(Array.from(kp.publicKey).map(b => b.toString(16).padStart(2, '0')).join('')).toBe(
-  '1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c'
-);
+expect(Array.from(kp.publicKey).map(b => b.toString(16).padStart(2, '0')).join(''))
+  .toBe('1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c');
 ```
 
 - [ ] **Step 2: 运行测试确认失败**
@@ -401,7 +390,7 @@ git commit -m "feat(agentport-web): account create/restore via POST /v1/auth, co
 - Produces: `approveTerminalV2(masterSecret: Uint8Array, ephemeralPub: Uint8Array, token: string): Promise<void>`（POST /v1/auth/response，response = box(0x00 || contentPub, ephemeralPub)）
 - Consumes: Task 2 的 boxEncrypt, Task 3 的 deriveContentKeyPair, account (token)
 
-- [ ] **Step 1: 写 terminalAuth.test.ts 失败测试（固定向量 + 真实 CLI 对照）**
+- [ ] **Step 1: 写 terminalAuth.test.ts 失败测试（固定向量）**
 
 ```ts
 import tweetnacl from 'tweetnacl';
@@ -410,35 +399,31 @@ import { decodeBase64 } from './base64';
 import { boxDecrypt } from './encryptDataKey';
 import { deriveContentKeyPair } from './account';
 
-// 官方固定向量
+// 固定向量（官方 CLI 生成）
 const ms = new Uint8Array(32).fill(0xab);
-// 固定临时密钥对（secretKey = 32 字节 0x11）
 const ephSec = new Uint8Array(32).fill(0x11);
 const eph = tweetnacl.box.keyPair.fromSecretKey(ephSec);
 // 官方向量：ephemeralPub = 7b4e909bbe7ffe44c465a220037d608ee35897d31ef972f07f74892cb0f73f13
-expect(Array.from(eph.publicKey).map(b => b.toString(16).padStart(2, '0')).join('')).toBe(
-  '7b4e909bbe7ffe44c465a220037d608ee35897d31ef972f07f74892cb0f73f13'
-);
-// 官方向量：contentPub = 1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c
+expect(Array.from(eph.publicKey).map(b => b.toString(16).padStart(2, '0')).join(''))
+  .toBe('7b4e909bbe7ffe44c465a220037d608ee35897d31ef972f07f74892cb0f73f13');
 const contentKp = await deriveContentKeyPair(ms);
-expect(Array.from(contentKp.publicKey).map(b => b.toString(16).padStart(2, '0')).join('')).toBe(
-  '1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c'
-);
+// 官方向量：contentPub = 1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c
+expect(Array.from(contentKp.publicKey).map(b => b.toString(16).padStart(2, '0')).join(''))
+  .toBe('1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c');
 
 // mock fetch
 let captured: any = {};
-global.fetch = vi.fn().mockImplementation(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) }));
+global.fetch = vi.fn().mockImplementation(() =>
+  Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) }));
 
 await approveTerminalV2(ms, eph.publicKey, 'test-token');
 
 expect(captured.url).toBe('/v1/auth/response');
-// 验证：response base64url 解码后，boxDecrypt(eph.secretKey) 得 0x00 || contentPub
 const resp = decodeBase64(captured.body.response, 'base64url');
 const opened = boxDecrypt(resp, eph.secretKey);
 expect(opened![0]).toBe(0x00);
-expect(Array.from(opened!.slice(1, 33)).map(b => b.toString(16).padStart(2, '0')).join('')).toBe(
-  '1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c'
-);
+expect(Array.from(opened!.slice(1, 33)).map(b => b.toString(16).padStart(2, '0')).join(''))
+  .toBe('1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c');
 ```
 
 - [ ] **Step 2: 运行测试确认失败**
@@ -449,14 +434,16 @@ expect(Array.from(opened!.slice(1, 33)).map(b => b.toString(16).padStart(2, '0')
 
 - [ ] **Step 4: 实现 TerminalConnectPage.tsx**
 
-从 hash 解析 `#key=<base64url>` → checkTerminalAuthStatus → pending 时显示设备名 + 授权按钮 → approveTerminalV2 → 成功后跳转 `#home`。not_found 显示"请求不存在或已过期，请在电脑上重新运行 auth login"，**不循环重试**。authorized 显示"已授权"。
+从 hash 解析 `#key=<base64url>` → checkTerminalAuthStatus → pending 时显示设备名 + 授权按钮 → approveTerminalV2 → 成功后跳转 `#home`。**not_found 显示"请求不存在或已过期，请在电脑上重新运行 auth login"，不循环重试**（服务端无 age 检查，not_found 只表示请求不存在；CLI 端轮询超时是客户端行为，与 not_found 分开）。authorized 显示"已授权"。
 
 - [ ] **Step 5: 提交**
 
 ```bash
 git add packages/agentport-web/src/
-git commit -m "feat(agentport-web): V2 terminal pairing with official vectors, not_found shows non-retrying message"
+git commit -m "feat(agentport-web): V2 terminal pairing with official vectors, not_found shows non-retrying message (separate from server expiry)"
 ```
+
+**Reviewer 卡点 1 的另一半**：Task 7 e2e 验证真实 CLI V2 配对（Node 脚本模拟 CLI + 浏览器 approveTerminalV2 的端到端）。
 
 ---
 
@@ -469,43 +456,32 @@ git commit -m "feat(agentport-web): V2 terminal pairing with official vectors, n
 
 **Interfaces:**
 - Produces: `fetchSessions(token: string): Promise<SessionSummary[]>`（GET /v1/sessions）
-- Produces: `fetchMessagesV3(token: string, sessionId: string, afterSeq: number): Promise<{messages: SessionMessage[]; hasMore: boolean}>`（GET /v3/sessions/:id/messages?after_seq=N）
-- Produces: `sendMessageV3(token: string, sessionId: string, encrypted: string, localId: string): Promise<void>`（POST /v3/sessions/:id/messages）
+- Produces: `fetchMessagesV3(token: string, sessionId: string, afterSeq: number): Promise<{messages: SessionMessage[]; hasMore: boolean}>`（GET /v3/sessions/:id/messages?after_seq=N&limit=100）
+- Produces: `sendMessageV3(token: string, sessionId: string, encrypted: string, localId: string): Promise<void>`（POST /v3/sessions/:id/messages，body {messages:[{content,localId}]}）
 - Produces: `SessionSummary` 类型：`{id, tag, dataEncryptionKey: string|null, createdAt, updatedAt, active}`
 - Produces: `unwrapDataKey(bundle: Uint8Array, contentSecretKey: Uint8Array): Uint8Array|null`（boxDecrypt，返回 32 字节 AES key）
-- Produces: `decryptMessage(encCiphertext: Uint8Array, aesKey: Uint8Array): Promise<any|null>`（**直接用 aesKey 做 AES-GCM**，不 deriveKey）
+- Produces: `decryptMessage(encCiphertext: Uint8Array, aesKey: Uint8Array): Promise<any|null>`（**直接用 aesKey 做 AES-GCM，不 deriveKey**）
 - Produces: `encryptMessage(content: unknown, aesKey: Uint8Array): Promise<Uint8Array>`（同上）
 - Produces: `isLegacySession(s: SessionSummary): boolean`（dataEncryptionKey === null）
 - Consumes: Task 2 的 decryptDataKey, boxDecrypt; Task 3 的 deriveContentKeyPair; happy-wire 的 SessionMessageSchema, MessageContentSchema
 
-**关键约束：消息 AES-GCM 直接用 box 解封后的原始 AES 密钥，不做第二层 deriveKey。`deriveKey(aesKey, 'Happy Blobs', ['session'])` 是 CLI `getBlobKey()` 给附件用的，不是给消息用的。**
+**关键约束：消息 AES-GCM 直接用 box 解封后的原始 AES 密钥，不做第二层 deriveKey。`deriveKey(aesKey, 'Happy Blobs', ['session'])` 是 CLI `getBlobKey()` 给附件用的，不是消息用的。**
 
 - [ ] **Step 1: 写 messageCodec.test.ts 失败测试（固定向量）**
 
 ```ts
 import { encryptMessage, decryptMessage, unwrapDataKey, isLegacySession } from './messageCodec';
-import { boxDecrypt } from './encryptDataKey';
-import tweetnacl from 'tweetnacl';
 import { decodeBase64 } from './base64';
 
-// 固定向量（官方 CLI 生成）
-const contentPub = decodeBase64('x8732P7c6k0KMTf1r4+2xPeSU1q66jkTzPbxyt0aiCw=');
-// 注意：base64url 编码的官方 contentPub
-const contentKp = tweetnacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(0x42));
-// 这里用 0x42 的 keypair 做格式测试，真实互通向量在 Task 7 e2e 验证
-
-// unwrapDataKey 固定向量
-// 官方 dataEncryptionKey = 009a654c52bd3d487f44d6a6a76b44bec3d34686aa01c292a805b4709c76ddc6725705e1c67ee8c42308ee0eec80c39a8a96e45b5a90fc2c0317d4a916f633fa59f0f70c0331db5b525d80bd09ffe8f44a592aa4382c8766b1af9a2a9b93569546fd49ba72a8e9a603
-// 用官方 contentSecretKey 解封得 AES key = 32 字节 0xCD
-const contentSec = new Uint8Array(32).fill(0x42); // 这里用 0x42 做格式测试
-// 真实的官方向量需要 contentPub 和 contentSecretKey 匹配，在 Task 7 e2e 中验证
-
-// 消息 AES-GCM 固定向量
+// 消息 AES-GCM 固定向量（官方 CLI encryptWithDataKey 生成）
 const aesKey = new Uint8Array(32).fill(0xcd);
 const msg = { role: 'user', content: { type: 'text', text: 'vector-test' } };
 const enc = await encryptMessage(msg, aesKey);
-// 官方向量：AES_MSG_BUNDLE = 00ef4b5cffaf9682348941eaddf8adfddfb69d755f92c6e56622a259918f6bbd8...
-expect(Array.from(enc.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')).toBe('00ef4b5cffaf9682');
+// 官方向量：AES_MSG_BUNDLE 前 8 字节 = 00ef4b5cffaf9682
+expect(enc[0]).toBe(0);
+expect(Array.from(enc.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(''))
+  .toBe('00ef4b5cffaf9682');
+expect(enc.length).toBe(91);
 const dec = await decryptMessage(enc, aesKey);
 expect(dec).toEqual(msg);
 const wrongKey = new Uint8Array(32).fill(0x11);
@@ -514,6 +490,23 @@ expect(await decryptMessage(enc, wrongKey)).toBeNull();
 // legacy 检测
 expect(isLegacySession({ id: 'x', tag: 't', dataEncryptionKey: null, createdAt: 0, updatedAt: 0, active: false })).toBe(true);
 expect(isLegacySession({ id: 'x', tag: 't', dataEncryptionKey: 'abc', createdAt: 0, updatedAt: 0, active: false })).toBe(false);
+
+// unwrapDataKey 格式测试（真实互通向量在 Task 7 e2e）
+import { boxDecrypt } from './encryptDataKey';
+import tweetnacl from 'tweetnacl';
+const kp = tweetnacl.box.keyPair();
+const aes = new Uint8Array(32).fill(0xaa);
+const boxBundle = (() => {
+  const eph = tweetnacl.box.keyPair();
+  const nonce = tweetnacl.randomBytes(tweetnacl.box.nonceLength);
+  const ct = tweetnacl.box(aes, nonce, kp.publicKey, eph.secretKey);
+  const out = new Uint8Array(32 + 24 + ct.length);
+  out.set(eph.publicKey, 0); out.set(nonce, 32); out.set(ct, 56);
+  return out;
+})();
+const deks = new Uint8Array(1 + boxBundle.length);
+deks.set([0], 0); deks.set(boxBundle, 1);
+expect(unwrapDataKey(deks, kp.secretKey)).toEqual(aes);
 ```
 
 - [ ] **Step 2: 运行测试确认失败**
@@ -539,6 +532,8 @@ expect(isLegacySession({ id: 'x', tag: 't', dataEncryptionKey: 'abc', createdAt:
 git add packages/agentport-web/src/lib/
 git commit -m "feat(agentport-web): session API, V3 message routes, dataKey unwrap, AES-GCM message codec (direct, no second deriveKey), legacy detection"
 ```
+
+**Reviewer 卡点 2 的一半**：消息编解码用原始 AES key（不做第二层 deriveKey），V3 路由。Task 7 e2e 验证 CLI 与浏览器双向加解密互通。
 
 ---
 
@@ -586,6 +581,8 @@ git add packages/agentport-web/src/
 git commit -m "feat(agentport-web): workbench device/session list, session detail with V3 messages, legacy disabled state, Socket.IO real-time"
 ```
 
+**Reviewer 卡点 2 的另一半**：Task 7 e2e 验证 CLI 与浏览器双向加解密 + V3 消息收发。
+
 ---
 
 ### Task 7: 端到端集成验证 — 真实 CLI V2 配对 + V3 双向消息 + 恢复凭据
@@ -597,10 +594,10 @@ git commit -m "feat(agentport-web): workbench device/session list, session detai
 **Interfaces:**
 - Consumes: 所有前序任务
 - Produces: 可重复的 e2e 测试命令和自托管启动脚本
-- **三道 reviewer 验收点：**
-  1. Task 2–4 的官方派生向量和真实 CLI V2 配对
-  2. Task 5–6 的 CLI 与浏览器双向加解密及 V3 消息收发
-  3. 本任务的干净配置端到端 + 第二浏览器恢复同一会话
+- **Reviewer 三道验收卡点的终点：**
+  1. Task 2–4 的官方派生向量和真实 CLI V2 配对（本任务 Step 5）
+  2. Task 5–6 的 CLI 与浏览器双向加解密及 V3 消息收发（本任务 Step 6–7）
+  3. 本任务的干净配置端到端 + 第二浏览器恢复同一会话（本任务 Step 8）
 
 - [ ] **Step 1: 写 run-selfhost.sh**
 
@@ -632,13 +629,13 @@ exec node "$REPO_ROOT/packages/happy-server-self-host/dist/standalone.mjs" serve
 
 - [ ] **Step 5: 验证真实 CLI V2 配对（reviewer 卡点 1）**
 
-Node 脚本模拟 CLI：生成临时 box keypair → POST /v1/auth/request {supportsV2: true} → 等待 → Node 脚本模拟浏览器 approveTerminalV2（用 Task 2 的 boxEncrypt，contentPub 用官方向量）→ CLI 轮询得到 response → 解密验证 `0x00 || contentPub` 匹配官方向量。
+Node 脚本模拟 CLI：生成临时 box keypair → POST /v1/auth/request {supportsV2: true} → 等待 → Node 脚本模拟浏览器 approveTerminalV2（用 Task 2 的 boxEncrypt，contentPub 用官方向量 `1e62c410ff03e83e4a3157f5af8db6c4f792534aafa39793cc76f1c2d71a882c`）→ CLI 轮询得到 response → boxDecrypt 验证 `0x00 || contentPub` 匹配官方向量。
 
 - [ ] **Step 6: 验证 dataKey 会话创建 + 浏览器解密（reviewer 卡点 2）**
 
-CLI 脚本：随机 32 字节 AES key → box(aesKey, contentPub) → POST /v1/sessions {tag, metadata, dataEncryptionKey}。浏览器脚本（Node 模拟）：GET /v1/sessions → unwrapDataKey → **fetchMessagesV3** → decryptMessage（直接用 aesKey，不 deriveKey）→ 验证消息内容匹配。
+CLI 脚本：随机 32 字节 AES key → box(aesKey, contentPub) ��� POST /v1/sessions {tag, metadata, dataEncryptionKey}。浏览器脚本（Node 模拟）：GET /v1/sessions → unwrapDataKey → **fetchMessagesV3** → decryptMessage（直接用 aesKey，不 deriveKey）→ 验证消息内容匹配。
 
-- [ ] **Step 7: 验证 V3 消��双向收发**
+- [ ] **Step 7: 验证 V3 消息双向收发**
 
 浏览器 POST message（sendMessageV3）→ CLI socket 收到并解密。CLI socket 发 message → 浏览器收到并解密。用 seq 号去重。验证 AES-GCM bundle 格式（version || nonce || ct || tag）。
 
@@ -685,7 +682,7 @@ status 返回 `not_found` 时显示"配对请求不存在或已过期，请在�
 
 ```bash
 git add packages/agentport-web/src/pages/
-git commit -m "feat(agentport-web): page states — loading, empty, error, legacy disabled, terminal-connect not_found (no retry)"
+git commit -m "feat(agentport-web): page states — loading, empty, error, legacy disabled, terminal-connect not_found (no retry, separate from server expiry)"
 ```
 
 ---
