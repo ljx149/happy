@@ -24,6 +24,15 @@
 - **配对不可用与服务端强制过期分开**：服务端无 age 检查，`not_found` 只表示请求不存在。浏览器收到 `not_found` 显示"请求不存在或已过期，请在电脑上重新运行 auth login"，不循环重试。CLI 端轮询超时是客户端行为，与 `not_found` 是两个独立场景。
 - **Reviewer 三道验收卡点**：Task 2–4 验证官方派生向量和真实 CLI V2 配对；Task 5–6 验证 CLI 与浏览器双向加解密及 V3 消息收发；Task 7 用干净配置跑完端到端并在第二个浏览器恢复同一会话。其余任务可连续执行。
 
+## Review Focus
+
+- 恢复凭据在 IndexedDB 中的存储：刷新页面后账户不能静默消失，也不能被其他用户读走——验证 IndexedDB 隔离
+- `/terminal/connect` 链接过期后用户看到的状态：请求不存在（`not_found`）与 CLI 端超时是两个不同场景，浏览器应显示"请求不存在或已过期，请在电脑上重新运行 auth login"，不循环重试
+- Socket.IO 断线重连：浏览器与 CLI 在同一 session 上同时在线时，消息不能丢失也不能重复——需要验证 seq 去重
+- 并发双浏览器：同一账户在两个浏览器同时打开，消息必须双向同步且加密格式一致
+- 浏览器 AES-GCM 与 CLI Node crypto 的互通：nonce 和 authTag 拼接顺序必须严格一致（version(1) || nonce(12) || ct || tag(16)）
+- 内容密钥 SHA-512 取前 32 字节：不能跳过，不能直接 `tweetnacl.box.keyPair.fromSecretKey(contentKey)`
+
 ---
 
 ### Task 1: 脚手架 — Vite + React + TS + 路由

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",
-    "test:protocol": "node --experimental-strip-types --test src/lib/protocol.test.ts"
+    "e2e": "tsx scripts/e2e-interop.mts --base http://127.0.0.1:3005"
   },
   "dependencies": {
     "react": "^18.3.0",
