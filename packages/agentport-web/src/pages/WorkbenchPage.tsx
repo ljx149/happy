@@ -26,8 +26,12 @@ export function WorkbenchPage({ account }: { account: Account }) {
   const [spawnBusy, setSpawnBusy] = useState(false);
   const [spawnResult, setSpawnResult] = useState<SpawnInterpretation | null>(null);
   const [spawnError, setSpawnError] = useState('');
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState('');
+  const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const spawnedRef = useRef(false);
+  const refreshRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     let active = true;
@@ -48,6 +52,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
     }
     const socket = io({ path: '/v1/updates', auth: { token: account.token, clientType: 'user-scoped' } });
     socketRef.current = socket;
+    refreshRef.current = () => { void refresh(); };
     void refresh();
     socket.on('connect', refresh);
     socket.on('update', update => {
@@ -150,6 +155,21 @@ export function WorkbenchPage({ account }: { account: Account }) {
     setDirectoryPending(null);
   }
 
+  async function removeDevice(machineId: string) {
+    if (removingId) return;
+    setRemovingId(machineId);
+    setRemoveError('');
+    try {
+      await api.removeMachine(account.token, machineId);
+      setConfirmingRemoveId(null);
+      refreshRef.current();
+    } catch (error) {
+      setRemoveError(errorText(error));
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   return <div className="layout workspace">
     <aside className="sidebar">
       <a className="back" href="#home">工作台</a>
@@ -166,9 +186,18 @@ export function WorkbenchPage({ account }: { account: Account }) {
       {!records && !error && <p role="status">正在同步工作台…</p>}
       {records && <div className="stack">
         <section className="panel"><h2>设备</h2>
+          {removeError && <p role="alert" className="pending">{removeError}</p>}
           {records.devices.length ? records.devices.map(device => <div className="row" key={device.id}>
-            <span>{device.title}</span><span className={device.active ? 'status online' : 'status'}>{device.active ? '● 在线' : '离线'}</span>
+            <span>{device.title}</span>
+            <span className={device.active ? 'status online' : 'status'}>{device.active ? '● 在线' : '离线'}</span>
+            {confirmingRemoveId === device.id
+              ? <span className="perm-actions">
+                <button type="button" className="primary" onClick={() => removeDevice(device.id)} disabled={removingId === device.id}>确认移除</button>
+                <button type="button" onClick={() => setConfirmingRemoveId(null)}>取消</button>
+              </span>
+              : <button type="button" onClick={() => setConfirmingRemoveId(device.id)}>移除设备</button>}
           </div>) : <p>暂无设备。请在电脑上运行 CLI 登录，打开终端给出的配对链接。</p>}
+          <p className="hint">「移除设备」只删除服务器上的设备记录和访问密钥，不会中断电脑上正在运行的进程，也不等同于撤销访问凭据。</p>
         </section>
         <section className="panel"><h2>新建会话</h2>
           {spawnBusy && <p role="status">正在启动…</p>}

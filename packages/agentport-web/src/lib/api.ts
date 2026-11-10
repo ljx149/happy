@@ -55,6 +55,16 @@ export function machines(token: string) {
   return request<RecordSummary[]>('/v1/machines', token);
 }
 
+export function removeMachine(token: string, id: string) {
+  return fetch('/v1/machines/' + encodeURIComponent(id), {
+    method: 'DELETE',
+    headers: { Authorization: 'Bearer ' + token },
+  }).then(async response => {
+    if (!response.ok) throw new ApiError(response.status);
+    return response.json() as Promise<{ success: boolean }>;
+  });
+}
+
 function messageUrl(id: string) {
   return '/v3/sessions/' + encodeURIComponent(id) + '/messages';
 }
