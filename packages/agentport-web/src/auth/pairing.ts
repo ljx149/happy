@@ -80,7 +80,8 @@ export function parsePairingLink(hash: string): Uint8Array | null {
     if (!match) return null;
     const b64url = match[1];
     const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - b64url.length % 4) % 4);
-    const raw = atob(b64);
+    let raw: string;
+    try { raw = atob(b64); } catch { return null; }
     const bytes = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
     return bytes.length === 32 ? bytes : null;

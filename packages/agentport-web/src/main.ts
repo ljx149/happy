@@ -11,6 +11,7 @@ const cfg = {
 };
 
 const store = new AuthStore(cfg);
+const pendingPairKey = location.pathname === '/terminal/connect' ? parsePairingLink(location.hash) : null;
 
 const screen = document.querySelector('#screen') as HTMLElement;
 const sidebar = document.querySelector('#sidebar') as HTMLElement;
@@ -22,20 +23,19 @@ function escapeHtml(value: string): string {
 }
 
 function routeName(): string {
-    return location.hash.slice(1) || 'home';
+    return location.hash.startsWith('#key=') ? 'pair' : location.hash.slice(1) || (pendingPairKey ? 'pair' : 'home');
 }
 
 async function loadMachines(token: string): Promise<Array<{ id: string; hostname: string; online: boolean }>> {
     try {
         const res = await fetch(`${cfg.baseUrl}/v1/machines`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.status === 401) { store.handleUnauthorized(); return []; }
+        if (res.status === 401) { store.handleUnauthorized(); void render(); return []; }
         if (!res.ok) return [];
-        const machines = (await res.json()) as Array<{ id: string; metadata?: { hostname?: string }; lastActiveAt?: string }>;
-        const now = Date.now();
-        return machines.map(m => ({
+        const machines = (await res.json()) as Array<{ id: string; metadata?: string; active?: boolean; activeAt?: number }>;
+            return machines.map(m => ({
             id: m.id,
-            hostname: m.metadata?.hostname ?? m.id.slice(0, 8),
-            online: m.lastActiveAt ? now - new Date(m.lastActiveAt).getTime() < 60_000 : false,
+            hostname: `设备 ${m.id.slice(0, 8)}（名称尚未解密）`,
+            online: m.active === true,
         }));
     } catch {
         return [];
@@ -63,7 +63,7 @@ async function render() {
             return;
         }
         if (s.phase === 'signedOut') {
-            screen.innerHTML = loginTemplate();
+            screen.innerHTML = requested === 'restore' ? restoreTemplate() : loginTemplate();
             return;
         }
     }
@@ -88,6 +88,7 @@ async function render() {
     layout.classList.add('workspace');
     sidebar.hidden = false;
     const machines = await loadMachines(s.token);
+    if (store.getState() !== s || routeName() !== requested) return;
 
     sidebar.innerHTML = `<nav aria-label="工作台导航">
         <a class="button primary" href="#pair">＋ 连接电脑</a>
@@ -134,7 +135,7 @@ function restoreTemplate(): string {
                 </label>
                 <div class="actions">
                     <button data-action="restore" class="primary">登录此密钥对应的账户</button>
-                    <button data-action="remember-check" class="button">记住此浏览器</button>
+                    
                 </div>
                 <p class="fine" role="status" id="restore-status"></p>
             </div>
@@ -149,7 +150,7 @@ function backupTemplate(formatted: string): string {
             <p>这是唯一能恢复账户的凭据。离线保存，丢失后无法找回。</p>
             <div class="panel stack">
                 <code class="readout backup">${escapeHtml(formatted)}</code>
-                <p class="fine">格式为分组 Base32，共 52 个字符（含连字符）。</p>
+                <p class="fine">格式为分组 Base32，共 52 个字符（不含连字符）。</p>
                 <div class="actions">
                     <button data-action="backup-done" class="primary">我已保存，继续 ↗</button>
                 </div>
@@ -162,7 +163,7 @@ function homeTemplate(machines: Array<{ id: string; hostname: string; online: bo
         <div class="page">
             <div class="hero">
                 <span class="eyebrow">WORKSPACE</span>
-                <h1>工作台</h1>
+                <h1>工作台</h1><button data-action="remember-check" class="button">记住此浏览器</button><p id="restore-status" role="status"></p>
                 <p>在浏览器里继续电脑上的开发任务。</p>
                 <div class="actions"><a class="button primary" href="#pair">＋ 连接电脑</a></div>
             </div>
@@ -193,7 +194,7 @@ function devicesTemplate(machines: Array<{ id: string; hostname: string; online:
 async function pairTemplate(s: AuthState): Promise<string> {
     if (s.phase !== 'signedIn') return '';
     // Parse the CLI's pairing link from the URL hash.
-    const cliPub = parsePairingLink(location.hash);
+    const cliPub = pendingPairKey ?? parsePairingLink(location.hash);
     if (!cliPub) {
         return `
             <div class="page">
@@ -212,11 +213,15 @@ async function pairTemplate(s: AuthState): Promise<string> {
     }
     // Query the request status.
     let statusText = '查询中…';
+    let canApprove = false;
     try {
         const st = await getTerminalAuthStatus(cliPub, cfg);
         if (st.status === 'not_found') statusText = '请求不存在或已过期。请在电脑上重新运行 <code>happy auth login</code>。';
         else if (st.status === 'authorized') statusText = '该请求已被授权。';
-        else statusText = '等待电脑确认。';
+        else {
+            canApprove = st.supportsV2;
+            statusText = canApprove ? '请确认授权这台电脑。' : '此客户端不支持 V2 配对，请更新 CLI。';
+        }
     } catch (e) {
         statusText = e instanceof AuthError && e.kind === 'network' ? '网络错误，无法查询请求状态。' : '查询请求状态失败。';
     }
@@ -230,7 +235,7 @@ async function pairTemplate(s: AuthState): Promise<string> {
             </div>
             <section class="panel stack" id="pair-confirm">
                 <div class="actions">
-                    <button data-action="approve-pair" class="primary">确认并授权</button>
+                    <button data-action="approve-pair" class="primary" ${canApprove ? '' : 'disabled'}>确认并授权</button>
                     <a class="button" href="#home">取消</a>
                 </div>
                 <p class="fine" role="status" id="pair-status"></p>
@@ -253,13 +258,13 @@ screen.addEventListener('click', async event => {
             screen.innerHTML = backupTemplate(formattedBackup);
         } catch { render(); }
     } else if (action === 'backup-done') {
-        location.hash = '#home';
+        location.hash = pendingPairKey ? '#pair' : '#home';
     } else if (action === 'restore') {
         const key = (screen.querySelector('#restore-key') as HTMLTextAreaElement | null)?.value ?? '';
         const el = statusEl(); if (el) el.textContent = '验证中…';
         try {
             await store.restore(key);
-            location.hash = '#home';
+            location.hash = pendingPairKey ? '#pair' : '#home';
         } catch {
             render(); // error state renders the message
         }
@@ -268,36 +273,53 @@ screen.addEventListener('click', async event => {
         if (!phrase) return;
         const s = store.getState();
         if (s.phase === 'signedIn') {
-            await store.remember(phrase);
-            const el = statusEl(); if (el) el.textContent = '已记住此浏览器。下次刷新可用同一口令解锁。';
+            try {
+                await store.remember(phrase);
+                const el = statusEl(); if (el) el.textContent = '已记住此浏览器。下次刷新可用同一口令解锁。';
+            } catch {
+                const el = statusEl(); if (el) el.textContent = '保存失败，请重试并保管恢复凭据。';
+            }
         }
     } else if (action === 'retry') {
+        store.resetError();
+        location.hash = '#restore';
         render();
     } else if (action === 'approve-pair') {
         const s = store.getState();
         if (s.phase !== 'signedIn') return;
-        const cliPub = parsePairingLink(location.hash);
+        const cliPub = pendingPairKey ?? parsePairingLink(location.hash);
         const el = statusEl();
         if (!cliPub) { if (el) el.textContent = '无效的配对链接。'; return; }
+        const button = screen.querySelector('[data-action="approve-pair"]') as HTMLButtonElement | null;
+        if (button?.disabled) return;
+        if (button) button.disabled = true;
         if (el) el.textContent = '正在加密授权材料…';
         try {
             const secret = decodeBase64(s.secretBase64Url, 'base64url');
             const response = await buildV2ApproverResponse(secret, cliPub);
             await approveTerminalAuth(s.token, cliPub, response, cfg);
-            if (el) el.textContent = '已授权。电脑将接收恢复凭据。';
-            setTimeout(() => { location.hash = '#home'; }, 1200);
+            if (el) el.textContent = '已提交授权。电脑将接收加密授权材料。';
+            setTimeout(() => { location.hash = pendingPairKey ? '#pair' : '#home'; }, 1200);
         } catch (e) {
             const msg = e instanceof AuthError && e.kind === 'network' ? '网络错误，授权未送达。' : '授权失败。';
             if (el) el.textContent = msg;
+            if (button) button.disabled = false;
         }
     }
 });
 
 account.addEventListener('click', () => {
-    store.logout().then(render);
+    currentBackup = null;
+    store.logout().then(render, () => render());
 });
 
-window.addEventListener('hashchange', () => render());
+window.addEventListener('hashchange', () => {
+    if (routeName() === 'login' || routeName() === 'restore') store.resetError();
+    render();
+});
+store.subscribe(s => {
+    if (s.phase === 'authenticating' || s.phase === 'error') void render();
+});
 
 // Startup: check for a remembered identity, then render.
 store.startup().then(async info => {

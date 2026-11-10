@@ -17,6 +17,8 @@ export interface StoredCredentials {
  */
 export interface IndexedDbRecord {
     version: 1;
+    /** PBKDF2 salt, distinct from the AES-GCM IV in salt. */
+    kdfSalt?: string;
     /** AES-GCM salt (12 bytes, base64). */
     salt: string;
     /** AES-GCM ciphertext + 16-byte auth tag (base64). */
