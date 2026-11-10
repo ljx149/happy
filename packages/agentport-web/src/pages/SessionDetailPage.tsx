@@ -1,3 +1,5 @@
+import { ModelSettingsFields } from './ModelSettingsFields';
+import { messageModelMeta, loadModelSettings, saveModelSettings, type ModelSettings } from '../lib/modelSettings';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import { MessageContentSchema, UserMessageSchema } from '@slopus/happy-wire';
@@ -17,6 +19,9 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
   const [sessionActive, setSessionActive] = useState(true);
   const [legacy, setLegacy] = useState(false);
   const [draft, setDraft] = useState('');
+  const [metadata, setMetadata] = useState<unknown>();
+  const [modelSettings, setModelSettings] = useState<ModelSettings>(() => loadModelSettings(id));
+  const agent = String(field(metadata, 'flavor') ?? 'claude');
   const [refresh, setRefresh] = useState<() => void>();
   const [title, setTitle] = useState(id.slice(0, 8));
   const [permRequests, setPermRequests] = useState<Array<{ id: string; tool?: string; arguments?: unknown; createdAt?: number }>>([]);
@@ -51,6 +56,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
           setLoaded(true);
           return;
         }
+        if (active) setMetadata(await decryptRecord(record.metadata, key));
         while (active && queued) {
           queued = false;
           let more = true;
@@ -118,7 +124,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
       const record = records.sessions.find(r => r.id === id);
       if (!record?.dataEncryptionKey) throw new Error('此会话暂不支持发送。');
       const key = unwrapKey(record.dataEncryptionKey, account.keys.secretKey);
-      const body = UserMessageSchema.parse({ role: 'user', content: { type: 'text', text: draft.trim() } });
+      const body = UserMessageSchema.parse({ role: 'user', content: { type: 'text', text: draft.trim() }, meta: messageModelMeta(agent, modelSettings, metadata) });
       const encrypted = await encryptRecord(body, key);
       await api.sendMessage(account.token, id, encrypted, crypto.randomUUID());
       setDraft('');
@@ -198,6 +204,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
     </div>}
     {permError && <p role="alert" className="pending">{permError}</p>}
     {sendError && <p role="alert" className="pending">{sendError}</p>}
+    {!legacy && loaded && <ModelSettingsFields agent={agent} metadata={metadata} value={modelSettings} onChange={value => { setModelSettings(value); saveModelSettings(id, value); }} />}
     {!legacy && <form className="composer" onSubmit={send}>
       <textarea aria-label="消息" rows={1} value={draft} onChange={event => setDraft(event.target.value)} placeholder="发送指令…" />
       <button className="primary" disabled={busy || !loaded || !draft.trim()}>发送 ↑</button>

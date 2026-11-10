@@ -1,3 +1,5 @@
+import { ModelSettingsFields } from './ModelSettingsFields';
+import { saveModelSettings, type ModelSettings } from '../lib/modelSettings';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import * as api from '../lib/api.ts';
@@ -23,8 +25,9 @@ export function WorkbenchPage({ account }: { account: Account }) {
   const [error, setError] = useState('');
   const [machineId, setMachineId] = useState('');
   const [agent, setAgent] = useState('claude');
+  const [modelSettings, setModelSettings] = useState<ModelSettings>({ model: '', effort: '' });
   const [directory, setDirectory] = useState('');
-  const [directoryPending, setDirectoryPending] = useState<{ machineId: string; deviceTitle: string; agent: string; directory: string; approvalPath: string } | null>(null);
+  const [directoryPending, setDirectoryPending] = useState<{ machineId: string; deviceTitle: string; agent: string; directory: string; approvalPath: string; modelSettings: ModelSettings } | null>(null);
   const [deviceSupport, setDeviceSupport] = useState<Record<string, DeviceAgentSupport>>({});
   const [spawnBusy, setSpawnBusy] = useState(false);
   const [spawnResult, setSpawnResult] = useState<SpawnInterpretation | null>(null);
@@ -87,7 +90,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
     }
   }
 
-  async function doSpawn(req: { machineId: string; agent: string; directory: string; approvedNewDirectoryCreation: boolean }) {
+  async function doSpawn(req: { machineId: string; agent: string; directory: string; approvedNewDirectoryCreation: boolean; modelSettings: ModelSettings }) {
     if (!req.machineId || !req.directory.trim()) return;
     const machineKey = machineKeyFor(req.machineId);
     if (!machineKey) {
@@ -103,7 +106,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
     setSpawnError('');
     try {
       const encrypted = await encodeSpawnParams(
-        buildSpawnParams({ directory: req.directory.trim(), agent: req.agent, approvedNewDirectoryCreation: req.approvedNewDirectoryCreation }),
+        buildSpawnParams({ directory: req.directory.trim(), agent: req.agent, modelMode: req.modelSettings.model.trim() || undefined, effortLevel: req.modelSettings.effort || undefined, approvedNewDirectoryCreation: req.approvedNewDirectoryCreation }),
         machineKey,
       );
       if (!socket.connected) {
@@ -128,10 +131,11 @@ export function WorkbenchPage({ account }: { account: Account }) {
       const interpretation = interpretSpawnResult(decoded);
       setSpawnResult(interpretation);
       if (interpretation.kind === 'success') {
+        saveModelSettings(interpretation.sessionId, req.modelSettings);
         location.hash = `#session/${interpretation.sessionId}`;
       } else if (interpretation.kind === 'directory-approval') {
         const deviceTitle = records?.devices.find(d => d.id === req.machineId)?.title ?? req.machineId;
-        setDirectoryPending({ machineId: req.machineId, deviceTitle, agent: req.agent, directory: req.directory, approvalPath: interpretation.directory });
+        setDirectoryPending({ machineId: req.machineId, deviceTitle, agent: req.agent, directory: req.directory, approvalPath: interpretation.directory, modelSettings: req.modelSettings });
       } else if (interpretation.kind === 'error') {
         spawnedRef.current = false;
         setSpawnError(interpretation.message);
@@ -158,7 +162,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
       return;
     }
     spawnedRef.current = true;
-    void doSpawn({ machineId, agent, directory, approvedNewDirectoryCreation: false });
+    void doSpawn({ machineId, agent, directory, modelSettings, approvedNewDirectoryCreation: false });
   }
 
   function confirmDirectoryCreation(event: FormEvent<HTMLFormElement>) {
@@ -167,7 +171,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
     const req = directoryPending;
     setDirectoryPending(null);
     setSpawnResult(null);
-    void doSpawn({ machineId: req.machineId, agent: req.agent, directory: req.approvalPath, approvedNewDirectoryCreation: true });
+    void doSpawn({ machineId: req.machineId, agent: req.agent, directory: req.approvalPath, modelSettings: req.modelSettings, approvedNewDirectoryCreation: true });
   }
 
   function resetSpawn() {
@@ -237,7 +241,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
               <option value="">选择设备…</option>
               {availableDevices.map(device => <option key={device.id} value={device.id}>{device.title}</option>)}
             </select>
-            <select aria-label="Agent" value={agent} onChange={event => setAgent(event.target.value)}>
+            <select aria-label="Agent" value={agent} onChange={event => { setAgent(event.target.value); setModelSettings({ model: '', effort: '' }); }}>
               <option value="claude" disabled={!deviceSupport[machineId]?.claude}>Claude Code（CC）</option>
               <option value="codex" disabled={!deviceSupport[machineId]?.codex}>Codex</option>
               <option value="dsh" disabled={!deviceSupport[machineId]?.dsh}>DSH（DeepSeek Harness）</option>
@@ -245,6 +249,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
             {machineId && !deviceSupport[machineId]?.dsh && agent === 'dsh' && (
               <p className="hint">该设备未报告 DSH 支持，请在电脑上安装 <code>dsh</code> 后刷新。</p>
             )}
+            <ModelSettingsFields agent={agent} value={modelSettings} onChange={setModelSettings} starting />
             <input aria-label="项目路径" value={directory} onChange={event => setDirectory(event.target.value)} placeholder="/path/to/project" />
             <button className="primary" type="submit" disabled={spawnBusy || !machineId || !directory.trim() || !deviceSupport[machineId]?.[agent as keyof DeviceAgentSupport] || (spawnResult?.kind === 'success')}>启动</button>
           </form>}

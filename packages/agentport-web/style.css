@@ -175,3 +175,8 @@ button, .button { border-radius: 10px; }
   #screen > .layout.workspace > .sidebar { display: none; }
   .spawn-form { display: flex; flex-direction: column; }
 }
+
+.model-settings { min-width: 0; grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-wrap: wrap; gap: 12px; }
+.model-settings label { flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.model-settings input, .model-settings select { width: 100%; min-width: 0; }
+.model-settings .hint { flex-basis: 100%; margin: 0; }

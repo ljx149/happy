@@ -64,7 +64,6 @@ export interface StartOptions {
 // The model works the same way: no default. This used to be 'opus', which
 // pinned every remote turn to the 200K model even when the user's own Claude
 // config (settings.json, ANTHROPIC_MODEL) said e.g. claude-opus-5[1m] (#1721).
-const DEFAULT_CLAUDE_EFFORT: 'low' | 'medium' | 'high' | 'xhigh' | 'max' = 'medium';
 type ClaudeGoalCommand = NonNullable<ReturnType<typeof parseClaudeGoalActionParams>>;
 type PendingClaudeGoalAction = {
     command: ClaudeGoalCommand;
@@ -541,7 +540,7 @@ export async function runClaude(credentials: Credentials, options: StartOptions 
     let currentAppendSystemPrompt: string | undefined = undefined; // Track current append system prompt
     let currentAllowedTools: string[] | undefined = undefined; // Track current allowed tools
     let currentDisallowedTools: string[] | undefined = undefined; // Track current disallowed tools
-    let currentEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | undefined = options.effort ?? DEFAULT_CLAUDE_EFFORT; // Track current Claude effort (thinking depth)
+    let currentEffort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | undefined = options.effort; // Track current Claude effort (thinking depth)
 
     const resetCurrentModeDefaults = () => {
         // Model and effort are deliberately NOT reset here. The app sends them

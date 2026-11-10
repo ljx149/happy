@@ -269,6 +269,7 @@ function formatEnvelopeForServerLog(agentName: string, envelope: SessionEnvelope
 type AcpSwitchMode = {
   permissionMode?: string;
   model?: string | null;
+  effort?: string | null;
 };
 
 type AcpSelectableOption = {
@@ -321,7 +322,7 @@ function flattenSelectOptions(options: unknown): AcpSelectableOption[] {
 
 function extractConfigSelector(
   configOptions: SessionConfigOption[],
-  category: 'mode' | 'model',
+  category: 'mode' | 'model' | 'thought_level',
 ): AcpConfigSelector | null {
   const optionMatchesCategory = (option: SessionConfigOption): boolean => {
     if (option.category === category) {
@@ -330,6 +331,7 @@ function extractConfigSelector(
     // Some ACP providers omit category; fallback to id/name heuristics.
     const id = normalizeComparable(option.id);
     const name = normalizeComparable(option.name);
+    if (category === 'thought_level') return id.includes('reasoning') || id.includes('effort') || name.includes('thinking');
     if (category === 'model') {
       return id.includes('model') || name.includes('model');
     }
@@ -520,6 +522,8 @@ export async function runAcp(opts: {
   const messageQueue = new MessageQueue2<AcpSwitchMode>((mode) => hashObject(mode));
   let currentPermissionMode: string | undefined;
   let currentModel: string | null | undefined;
+  let currentEffort: string | null | undefined;
+  let effortSelector: AcpConfigSelector | null = null;
   let modeSelector: AcpConfigSelector | null = null;
   let modelSelector: AcpConfigSelector | null = null;
   let legacyModes: SessionModeState | null = null;
@@ -642,6 +646,16 @@ export async function runAcp(opts: {
     }
   };
 
+  const switchEffortIfRequested = async (requested: string): Promise<void> => {
+    if (!effortSelector) throw new Error('This Agent has not advertised reasoning-effort options.');
+    const value = resolveRequestedCode(effortSelector.options, requested);
+    if (!value) throw new Error('Unsupported reasoning effort for the selected model: ' + requested);
+    if (value !== effortSelector.currentCode) {
+      if (!await backend.setSessionConfigOption(effortSelector.configId, value)) throw new Error('Agent rejected the reasoning-effort selection.');
+      effortSelector.currentCode = value;
+    }
+  };
+
   const switchModelIfRequested = async (requestedModel: string): Promise<void> => {
     if (!requestedModel) {
       return;
@@ -723,6 +737,7 @@ export async function runAcp(opts: {
 
         modeSelector = extractConfigSelector(configOptions, 'mode');
         modelSelector = extractConfigSelector(configOptions, 'model');
+        effortSelector = extractConfigSelector(configOptions, 'thought_level');
         if (verbose) {
           if (modeSelector) {
             sawModes = true;
@@ -856,9 +871,12 @@ export async function runAcp(opts: {
       logger.debug(`[${opts.agentName}] Requested ACP model: ${currentModel ?? 'null'}`);
     }
 
+    if (message.meta && Object.prototype.hasOwnProperty.call(message.meta, 'effort')) currentEffort = message.meta.effort ?? null;
+
     messageQueue.push(message.content.text, {
       permissionMode: currentPermissionMode,
       model: currentModel,
+      effort: currentEffort,
     });
   });
   session.keepAlive(thinking, 'remote');
@@ -932,6 +950,7 @@ export async function runAcp(opts: {
         if (typeof batch.mode.model === 'string' && batch.mode.model.length > 0) {
           await switchModelIfRequested(batch.mode.model);
         }
+        if (batch.mode.effort) await switchEffortIfRequested(batch.mode.effort);
         await backend.sendPrompt(acpSessionId, batch.message);
         await turnEnded;
         sendEnvelopes(sessionManager.endTurn('completed'));

@@ -15,6 +15,10 @@ function contaminatedEnvironment(): NodeJS.ProcessEnv {
 }
 
 describe('sessionEnvironment', () => {
+    it('preserves local provider configuration and credentials environment', () => {
+        const providerEnv = { CODEX_HOME: '/custom/codex', CLAUDE_CONFIG_DIR: '/custom/claude', DSH_HOME: '/custom/dsh', OPENAI_BASE_URL: 'https://provider.example/v1', ANTHROPIC_BASE_URL: 'https://provider.example/anthropic', OPENAI_API_KEY: 'test-value' };
+        expect(buildSessionChildEnvironment(providerEnv)).toEqual(providerEnv);
+    });
     it('removes all inherited session-scoped values without mutating the source', () => {
         const source = contaminatedEnvironment();
 
