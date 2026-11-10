@@ -1,5 +1,6 @@
 import * as privacyKit from "privacy-kit";
 import { debug, log } from "@/utils/log";
+import { isRevoked, recordRevocation, RevocationScope, RevocationScopeValue } from "@/app/auth/revoke";
 
 /** Cache entries expire after 24 hours */
 const TOKEN_CACHE_TTL = 24 * 60 * 60 * 1000;
@@ -10,6 +11,11 @@ const CLEANUP_INTERVAL = 10 * 60 * 1000;
 
 interface TokenCacheEntry {
     userId: string;
+    // The token's stable identifier (its jti). Stored so a cache hit can be
+    // cross-checked against the persistent revocation record — a cache entry
+    // alone does not keep a token usable, and clearing the cache does not
+    // undo a revocation.
+    jti: string | null;
     extras?: any;
     cachedAt: number;
 }
@@ -75,45 +81,70 @@ class AuthModule {
         }
         
         const token = await this.tokens.generator.new(payload);
-        
+
+        // Capture the token's stable identifier (its jti) so every future
+        // verification — cache hit or miss — can be checked against the
+        // persistent revocation record.
+        const verified = await this.tokens.verifier.verify(token);
+        const jti = verified?.uuid ?? null;
+
         // Cache the token immediately
         this.tokenCache.set(token, {
             userId,
+            jti,
             extras,
             cachedAt: Date.now()
         });
-        
+
         return token;
     }
     
-    async verifyToken(token: string): Promise<{ userId: string; extras?: any } | null> {
+    async verifyToken(token: string): Promise<{ userId: string; jti: string | null; extras?: any } | null> {
         // Check cache first (with TTL)
         const cached = this.tokenCache.get(token);
         if (cached) {
             if (Date.now() - cached.cachedAt > TOKEN_CACHE_TTL) {
                 this.tokenCache.delete(token);
             } else {
+                // A cache hit is not a pass: the persistent revocation record
+                // must still be checked, otherwise a cached token outlives a
+                // revocation for up to the 24h TTL.
+                const session = (cached.extras?.session as string | null) ?? null;
+                if (await isRevoked(cached.userId, cached.jti, session)) {
+                    this.tokenCache.delete(token);
+                    return null;
+                }
                 return {
                     userId: cached.userId,
+                    jti: cached.jti,
                     extras: cached.extras
                 };
             }
         }
-        
+
         // Cache miss - verify token
         if (!this.tokens) {
             throw new Error('Auth module not initialized');
         }
-        
+
         try {
             const verified = await this.tokens.verifier.verify(token);
             if (!verified) {
                 return null;
             }
-            
+
             const userId = verified.user as string;
             const extras = verified.extras;
-            
+            const jti = verified.uuid ?? null;
+            const session = (extras?.session as string | null) ?? null;
+
+            // Persistent revocation check. This is what makes revocation
+            // durable across restarts and cache clears: the record lives in
+            // the database, not in memory.
+            if (await isRevoked(userId, jti, session)) {
+                return null;
+            }
+
             // Evict oldest entries if cache is at capacity
             if (this.tokenCache.size >= MAX_CACHE_SIZE) {
                 const oldest = [...this.tokenCache.entries()]
@@ -126,12 +157,13 @@ class AuthModule {
 
             this.tokenCache.set(token, {
                 userId,
+                jti,
                 extras,
                 cachedAt: Date.now()
             });
-            
-            return { userId, extras };
-            
+
+            return { userId, jti, extras };
+
         } catch (error) {
             debug({ module: 'auth' }, `auth:token-verification-failed error=${error}`);
             return null;

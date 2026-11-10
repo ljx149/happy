@@ -3,6 +3,7 @@ import { log } from "@/utils/log";
 import { GitHubProfile } from "@/app/api/types";
 import { AccountProfile } from "@/types";
 import { getPublicUrl } from "@/storage/files";
+import { db } from "@/storage/db";
 import type { SessionMessageContent } from "@slopus/happy-wire";
 import { sessionAvatar, type SessionAvatar } from '@/app/session/sessionAvatar';
 
@@ -324,6 +325,50 @@ class EventRouter {
             .timeout(PRESENCE_FETCH_TIMEOUT_MS)
             .fetchSockets();
         return sockets.some(s => s.data.clientType === 'user-scoped' && s.data.appState === 'active');
+    }
+
+    /**
+     * Disconnect the live sockets of a user whose token has been revoked.
+     * A revocation recorded in the database is only enforced on a cache miss,
+     * so a token already cached (or already connected) would otherwise keep
+     * working until its 24h TTL. This actively closes the connection; the
+     * client's reconnect is then refused by the revocation-aware handshake.
+     *
+     * Matching mirrors the revocation scopes: account revocation kills every
+     * socket for the user; session/device revocation kills only the sockets
+     * carrying the matching identity (jti or pairing session), so logging out
+     * one browser does not drop the others.
+     */
+    async disconnectRevoked(userId: string): Promise<number> {
+        const sockets = await this.io.in(`user:${userId}`)
+            .timeout(PRESENCE_FETCH_TIMEOUT_MS)
+            .fetchSockets();
+        const revoked = await db.tokenRevocation.findMany({
+            where: {
+                OR: [
+                    { subject: userId },
+                    ...(sockets.length ? sockets.map(s => ({ subject: s.data.jti as string })) : []),
+                    ...(sockets.length ? sockets.map(s => ({ subject: s.data.pairingSession as string })) : []),
+                ].filter((c): c is { subject: string } => typeof c.subject === 'string'),
+            },
+        });
+        const bySubject = new Map(revoked.map(r => [r.subject, r.scope]));
+        let closed = 0;
+        for (const socket of sockets) {
+            const jti = socket.data.jti as string | null;
+            const session = socket.data.pairingSession as string | null;
+            const accountScope = bySubject.get(userId);
+            const sessionScope = jti ? bySubject.get(jti) : undefined;
+            const deviceScope = session ? bySubject.get(session) : undefined;
+            const revokedMatch = (accountScope === 'account')
+                || (sessionScope === 'session')
+                || (deviceScope === 'device');
+            if (revokedMatch) {
+                await socket.disconnect(true);
+                closed++;
+            }
+        }
+        return closed;
     }
 
     // === PRIVATE ROUTING LOGIC ===

@@ -54,6 +54,10 @@ declare module 'fastify' {
     interface FastifyRequest {
         userId: string;
         startTime?: number;
+        // The authenticated token's stable identifiers, set by `authenticate`.
+        jti: string | null;
+        // The pairing session that issued this token (extras.session), if any.
+        session: string | null;
     }
     interface FastifyInstance {
         authenticate: any;

@@ -88,6 +88,11 @@ export function startSocket(app: Fastify) {
         socket.data.clientType = clientType;
         socket.data.sessionId = sessionId;
         socket.data.machineId = machineId;
+        // Stable identifiers of this token's identity, so an active revocation
+        // (session = its jti, device = its pairing session, account = its user)
+        // can disconnect the live connection, not just refuse a reconnect.
+        socket.data.jti = verified.jti;
+        socket.data.pairingSession = (verified.extras?.session as string | null) ?? null;
         socket.data.happyClient = socket.handshake.auth.happyClient as string
             || socket.handshake.headers['x-happy-client'] as string
             || undefined;

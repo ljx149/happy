@@ -22,6 +22,11 @@ export function enableAuthentication(app: Fastify) {
 
             debug({ module: 'auth' }, `auth:success userId=${verified.userId}`);
             request.userId = verified.userId;
+            // Stable identifiers of this token, so the revocation routes can
+            // target exactly this session (its jti) or its pairing device
+            // (extras.session) without the client sending them.
+            request.jti = verified.jti ?? null;
+            request.session = (verified.extras?.session as string | null) ?? null;
         } catch (error) {
             return reply.code(401).send({ error: 'Authentication failed' });
         }
