@@ -98,7 +98,7 @@ describe('terminal auth request lifecycle (real PGlite)', () => {
 
         const claimed = [r1, r2].filter(r => r.claimed);
         expect(claimed).toHaveLength(1);
-        const stored = await (holder.db as PrismaClient).terminalAuthRequest.findUnique({ where: { publicKey: pk } });
+        const stored = (await (holder.db as PrismaClient).terminalAuthRequest.findUnique({ where: { publicKey: pk } }))!;
         expect(stored.responseAccountId).not.toBeNull();
         expect(stored.response).not.toBeNull();
         // The loser's response must not have overwritten the winner's.
@@ -116,7 +116,7 @@ describe('terminal auth request lifecycle (real PGlite)', () => {
         expect(again.claimed).toBe(true);
         const other = await approveTerminalAuth(pk, 'sealed', 'account-B');
         expect(other.claimed).toBe(false);
-        const stored = await (holder.db as PrismaClient).terminalAuthRequest.findUnique({ where: { publicKey: pk } });
+        const stored = (await (holder.db as PrismaClient).terminalAuthRequest.findUnique({ where: { publicKey: pk } }))!;
         expect(stored.responseAccountId).toBe('account-A');
     });
 
@@ -158,7 +158,7 @@ describe('account auth request lifecycle (real PGlite)', () => {
             approveAccountAuth(pk, 'sealed-B', 'account-B'),
         ]);
         expect([r1, r2].filter(r => r.claimed)).toHaveLength(1);
-        const stored = await (holder.db as PrismaClient).accountAuthRequest.findUnique({ where: { publicKey: pk } });
+        const stored = (await (holder.db as PrismaClient).accountAuthRequest.findUnique({ where: { publicKey: pk } }))!;
         expect(stored.responseAccountId).not.toBeNull();
     });
 
