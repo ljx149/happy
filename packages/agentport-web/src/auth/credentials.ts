@@ -135,3 +135,19 @@ export async function decryptSecret(saltB64: string, ciphertextB64: string, key:
     );
     return new TextDecoder().decode(plaintext);
 }
+
+// Browser-managed identity, isolated by the configured server. Like any browser
+// credential, this is accessible to same-origin code; it is not an XSS boundary.
+export async function localIdentity(server: string, action: 'read' | 'write' | 'delete', secret?: string): Promise<string | null> {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, action === 'read' ? 'readonly' : 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const id = `identity:${new URL(server).origin}`;
+        const request = action === 'read' ? store.get(id) : action === 'write' ? store.put(secret, id) : store.delete(id);
+        let value: string | null = null;
+        request.onsuccess = () => { if (action === 'read' && typeof request.result === 'string') value = request.result; };
+        tx.oncomplete = () => { db.close(); resolve(value); };
+        tx.onabort = tx.onerror = () => { db.close(); reject(tx.error ?? new Error('无法保存浏览器身份')); };
+    });
+}

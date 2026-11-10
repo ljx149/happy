@@ -1,3 +1,4 @@
+import { localIdentity } from './credentials';
 import { getToken, verifyToken, AuthError, AuthServerConfig } from './authClient';
 import { format, normalize } from './backup';
 import { decodeBase64Url } from './crypto';
@@ -14,9 +15,8 @@ export type AuthState =
     | { phase: 'error'; message: string; retryable: boolean };
 
 /**
- * Holds the in-memory identity for the current tab. The token and secret
- * never leave this object unless explicitly persisted via "remember this
- * browser". A refresh without "remember" loses the session.
+ * Holds the in-memory identity for the current tab. The account secret is automatically persisted for this server; tokens
+ * are refreshed by signing in again at startup.
  */
 export class AuthStore {
     private state: AuthState = { phase: 'initializing' };
@@ -42,26 +42,29 @@ export class AuthStore {
     }
 
     /**
-     * On startup: check IndexedDB for a remembered identity. If present,
-     * prompt for the unlock phrase (the caller handles that UI); the store
-     * itself only reports that a remembered identity exists.
+     * Restore the browser identity automatically. Legacy password-protected
+     * records still require one unlock before migration.
      */
     async startup(): Promise<{ remembered: boolean }> {
-        const record = await readStoredCredentials();
-        if (record) {
-            // We have a remembered identity but need the phrase to unlock.
-            // The caller will show the restore screen with a "unlock" button.
+        try {
+            const secret = await localIdentity(this.cfg.baseUrl, 'read');
+            if (secret) {
+                await this.restore(secret);
+                return { remembered: false };
+            }
+            const record = await readStoredCredentials();
             this.setState({ phase: 'signedOut' });
-            return { remembered: true };
+            return { remembered: !!record && record.origin === this.cfg.baseUrl };
+        } catch (e) {
+            this.setState({ phase: 'error', message: e instanceof Error ? e.message : '无法读取本地身份', retryable: true });
+            return { remembered: false };
         }
-        this.setState({ phase: 'signedOut' });
-        return { remembered: false };
     }
 
     /**
      * Create a new account: generate a random 32-byte secret, sign a
-     * challenge, and POST /v1/auth. On success the identity is in memory
-     * only — the caller must show the backup step before the user proceeds.
+     * challenge, and POST /v1/auth. On success the identity is saved in this browser before proceeding.
+     * Manual backup is optional and available in account settings.
      */
     async createAccount(): Promise<{ secretBase64Url: string; formattedBackup: string; token: string }> {
         if (this.inFlight) throw new Error('Auth already in progress');
@@ -74,6 +77,7 @@ export class AuthStore {
                 const token = await getToken(secret, this.cfg);
                 const ok = await verifyToken(token, this.cfg);
                 if (!ok) throw new AuthError('Token not accepted by protected endpoint', 0, 'unknown');
+                await localIdentity(this.cfg.baseUrl, 'write', secretBase64Url);
                 this.setState({ phase: 'signedIn', token, secretBase64Url });
                 return { secretBase64Url, formattedBackup: format(secretBase64Url), token };
             } catch (e) {
@@ -111,6 +115,7 @@ export class AuthStore {
                 const token = await getToken(secret, this.cfg);
                 const ok = await verifyToken(token, this.cfg);
                 if (!ok) throw new AuthError('Token not accepted by protected endpoint', 0, 'unknown');
+                await localIdentity(this.cfg.baseUrl, 'write', secretBase64Url);
                 this.setState({ phase: 'signedIn', token, secretBase64Url });
                 return { token };
             } catch (e) {
@@ -149,6 +154,7 @@ export class AuthStore {
                 const token = await getToken(secret, this.cfg);
                 const ok = await verifyToken(token, this.cfg);
                 if (!ok) throw new AuthError('Token not accepted by protected endpoint', 0, 'unknown');
+                await localIdentity(this.cfg.baseUrl, 'write', secretBase64Url);
                 this.setState({ phase: 'signedIn', token, secretBase64Url });
             } catch (e) {
                 const msg = e instanceof AuthError ? e.message : `Auth failed: ${e instanceof Error ? e.message : String(e)}`;
@@ -182,6 +188,7 @@ export class AuthStore {
     async logout(): Promise<void> {
         this.pendingSecret = null;
         this.setState({ phase: 'signedOut' });
+        await localIdentity(this.cfg.baseUrl, 'delete');
         await clearStoredCredentials();
     }
 
