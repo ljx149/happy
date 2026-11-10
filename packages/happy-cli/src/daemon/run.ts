@@ -36,6 +36,7 @@ import {
 } from './sessionEnvironment';
 import { startHappyTerminalDaemon } from './happyTerminalBoot';
 import { appendDaemonSpawnModeArgs, shouldForwardDaemonPermissionMode } from './spawnModeArgs';
+import { buildDaemonSpawnArgs } from './agentSpawnArgs';
 import { hasPersistedProcessConflict, isPidAlive, machineBootTimeMs } from './sessionLiveness';
 
 /** Shell-escape a string for safe interpolation into tmux commands. */
@@ -325,6 +326,14 @@ export async function startDaemon(): Promise<void> {
       }
 
       try {
+        const spawnArgs = buildDaemonSpawnArgs(options.agent);
+        if (!spawnArgs) {
+          return {
+            type: 'error',
+            errorMessage: `Unsupported agent type: '${options.agent}'. Please update your CLI to the latest version.`,
+          };
+        }
+        const agentLabel = options.agent ?? 'claude';
 
         // Build environment variables for session spawning
         // Authentication tokens are resolved here
@@ -435,20 +444,16 @@ export async function startDaemon(): Promise<void> {
 
           // Construct command for the CLI
           const cliPath = join(projectPath(), 'dist', 'index.mjs');
-          // Determine agent command - support claude, codex, gemini, openclaw, and agy
-          const agent = options.agent === 'gemini' ? 'gemini' : (options.agent === 'codex' ? 'codex' : (options.agent === 'openclaw' ? 'openclaw' : (options.agent === 'agy' ? 'agy' : 'claude')));
-          const resumeId = agent === 'claude'
+          // Resume ids attach the new Happy session to a pre-existing provider
+          // conversation created by the fork / duplicate RPC.
+          const resumeId = agentLabel === 'claude'
             ? options.resumeClaudeSessionId
-            : (agent === 'codex' ? options.resumeCodexThreadId : undefined);
+            : (agentLabel === 'codex' ? options.resumeCodexThreadId : undefined);
           const resumeFragment = resumeId
             ? ` --resume ${shellescape(resumeId)}`
             : '';
-          const launchArgs = [
-            agent,
-            '--happy-starting-mode', 'remote',
-            '--started-by', 'daemon',
-          ];
-          appendDaemonSpawnModeArgs(launchArgs, options, agent);
+          const launchArgs = [...spawnArgs];
+          appendDaemonSpawnModeArgs(launchArgs, options, agentLabel);
           const modeFragment = launchArgs.map(shellescape).join(' ');
           const fullCommand = `node --no-warnings --no-deprecation ${shellescape(cliPath)} ${modeFragment}${resumeFragment}`;
           const sanitizedTmuxCommand = wrapTmuxCommandWithSessionEnvironmentSanitizer(fullCommand, extraEnv);
@@ -459,7 +464,7 @@ export async function startDaemon(): Promise<void> {
           // 2. regular spawning uses the same clean environment
           // 3. tmux needs explicit -e values, and the command unsets omitted
           //    session variables that could otherwise survive in its server environment
-          const windowName = `happy-${Date.now()}-${agent}`;
+          const windowName = `happy-${Date.now()}-${agentLabel}`;
           const tmuxEnv: Record<string, string> = {};
 
           // Add all safe daemon environment variables (filtering out undefined)
@@ -531,44 +536,17 @@ export async function startDaemon(): Promise<void> {
         if (!useTmux) {
           logger.debug(`[DAEMON RUN] Using regular process spawning`);
 
-          // Construct arguments for the CLI - support claude, codex, and gemini
-          let agentCommand: string;
-          switch (options.agent) {
-            case 'claude':
-            case undefined:
-              agentCommand = 'claude';
-              break;
-            case 'codex':
-              agentCommand = 'codex';
-              break;
-            case 'gemini':
-              agentCommand = 'gemini';
-              break;
-            case 'openclaw':
-              agentCommand = 'openclaw';
-              break;
-            case 'agy':
-              agentCommand = 'agy';
-              break;
-            default:
-              return {
-                type: 'error',
-                errorMessage: `Unsupported agent type: '${options.agent}'. Please update your CLI to the latest version.`
-              };
-          }
-          const args = [
-            agentCommand,
-            '--happy-starting-mode', 'remote',
-            '--started-by', 'daemon'
-          ];
-          appendDaemonSpawnModeArgs(args, options, agentCommand);
+          // Construct arguments for the CLI - support claude, codex, gemini,
+          // openclaw, agy, and dsh (via the ACP subcommand).
+          const args = [...spawnArgs];
+          appendDaemonSpawnModeArgs(args, options, agentLabel);
 
           // Resume ids attach the new Happy session to a pre-existing provider
           // conversation created by the fork / duplicate RPC.
-          if (options.resumeClaudeSessionId && agentCommand === 'claude') {
+          if (options.resumeClaudeSessionId && agentLabel === 'claude') {
             args.push('--resume', options.resumeClaudeSessionId);
           }
-          if (options.resumeCodexThreadId && agentCommand === 'codex') {
+          if (options.resumeCodexThreadId && agentLabel === 'codex') {
             args.push('--resume', options.resumeCodexThreadId);
           }
 

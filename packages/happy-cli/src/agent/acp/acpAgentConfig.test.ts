@@ -6,6 +6,7 @@ describe('KNOWN_ACP_AGENTS', () => {
     expect(KNOWN_ACP_AGENTS).toEqual({
       gemini: { command: 'gemini', args: ['--experimental-acp'] },
       opencode: { command: 'opencode', args: ['acp'] },
+      dsh: { command: 'dsh', args: ['--profile', 'acp'] },
     });
   });
 });
@@ -24,6 +25,22 @@ describe('resolveAcpAgentConfig', () => {
       agentName: 'opencode',
       command: 'opencode',
       args: ['acp', '--foo'],
+    });
+  });
+
+  it('resolves dsh to the DeepSeek Harness ACP stdio profile', () => {
+    expect(resolveAcpAgentConfig(['dsh'])).toEqual({
+      agentName: 'dsh',
+      command: 'dsh',
+      args: ['--profile', 'acp'],
+    });
+  });
+
+  it('appends passthrough args to the dsh profile', () => {
+    expect(resolveAcpAgentConfig(['dsh', '--verbose'])).toEqual({
+      agentName: 'dsh',
+      command: 'dsh',
+      args: ['--profile', 'acp', '--verbose'],
     });
   });
 
