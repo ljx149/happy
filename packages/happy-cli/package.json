@@ -128,7 +128,7 @@
     "vitest": "^3.2.4"
   },
   "publishConfig": {
-    "registry": "https://registry.npmjs.org"
+    "registry": "https://registry.xcodex.vip"
   },
   "packageManager": "pnpm@10.11.0"
 }
