@@ -1,8 +1,7 @@
 /**
- * Credential persistence. Default is in-memory only — a refresh loses the
- * session and the user must restore. The "remember this browser" option
- * stores the secret in IndexedDB, wrapped with authenticated encryption
- * keyed from a user-supplied unlock phrase. The phrase is never stored.
+ * Browser identity persistence in IndexedDB, isolated by server origin.
+ * Current identities are saved automatically; legacy password-encrypted
+ * records remain supported for migration after the user unlocks them.
  */
 export interface StoredCredentials {
     /** base64url-encoded 32-byte account secret. */
