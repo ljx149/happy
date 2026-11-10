@@ -19,8 +19,54 @@ function mockServer() {
     });
 }
 
+/** In-memory IndexedDB stub for the node vitest environment. */
+function installIndexedDbStub() {
+    const stores = new Map<string, Map<string, unknown>>();
+    const getStore = (name: string) => {
+        if (!stores.has(name)) stores.set(name, new Map());
+        return stores.get(name)!;
+    };
+    const makeReq = (result?: unknown) => {
+        const req: { onsuccess?: () => void; onerror?: () => void; result?: unknown } = { result };
+        queueMicrotask(() => { req.onsuccess?.(); });
+        return req;
+    };
+    const db = {
+        objectStoreNames: { contains: () => true },
+        createObjectStore: (name: string) => { getStore(name); },
+        transaction: (name: string) => {
+            const tx: { objectStore: () => unknown; oncomplete?: () => void } = {
+                objectStore: () => ({
+                    put: (val: unknown, key: string) => { getStore(name).set(key, val); return makeReq(); },
+                    delete: (key: string) => { getStore(name).delete(key); return makeReq(); },
+                    get: (key: string) => makeReq(getStore(name).get(key)),
+                }),
+            };
+            queueMicrotask(() => { tx.oncomplete?.(); });
+            return tx;
+        },
+        close: () => {},
+    };
+    vi.stubGlobal('indexedDB', {
+        open: () => {
+            const req: { onsuccess?: () => void; onerror?: () => void; result?: unknown } = { result: db };
+            queueMicrotask(() => { req.onsuccess?.(); });
+            return req;
+        },
+    });
+}
+
 describe('AuthStore state machine', () => {
     afterEach(() => vi.unstubAllGlobals());
+
+    it('logout clears the in-memory identity', async () => {
+        installIndexedDbStub();
+        vi.stubGlobal('fetch', mockServer());
+        const store = new AuthStore(cfg);
+        await store.createAccount();
+        await store.logout();
+        expect(store.getState().phase).toBe('signedOut');
+    });
 
     it('401 on a protected endpoint drops back to signedOut', async () => {
         vi.stubGlobal('fetch', mockServer());
@@ -48,14 +94,6 @@ describe('AuthStore state machine', () => {
         const s = store.getState();
         expect(s.phase).toBe('error');
         if (s.phase === 'error') expect(s.retryable).toBe(false);
-    });
-
-    it('logout clears the in-memory identity', async () => {
-        vi.stubGlobal('fetch', mockServer());
-        const store = new AuthStore(cfg);
-        await store.createAccount();
-        await store.logout();
-        expect(store.getState().phase).toBe('signedOut');
     });
 
     it('concurrent restores share one in-flight operation', async () => {

@@ -12,10 +12,10 @@ const cfg = {
 
 const store = new AuthStore(cfg);
 
-const screen = document.querySelector('#screen')!;
-const sidebar = document.querySelector('#sidebar')!;
-const layout = document.querySelector('#layout')!;
-const account = document.querySelector('#account')!;
+const screen = document.querySelector('#screen') as HTMLElement;
+const sidebar = document.querySelector('#sidebar') as HTMLElement;
+const layout = document.querySelector('#layout') as HTMLElement;
+const account = document.querySelector('#account') as HTMLButtonElement;
 
 function escapeHtml(value: string): string {
     return value.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
@@ -243,7 +243,7 @@ async function pairTemplate(s: AuthState): Promise<string> {
 let currentBackup: string | null = null;
 
 screen.addEventListener('click', async event => {
-    const action = event.target instanceof Element ? event.target.closest('[data-action]')?.dataset.action : undefined;
+    const action = event.target instanceof Element ? (event.target.closest('[data-action]') as HTMLElement | null)?.dataset.action : undefined;
     const statusEl = () => screen.querySelector('#restore-status, #pair-status') as HTMLElement | null;
 
     if (action === 'create') {
