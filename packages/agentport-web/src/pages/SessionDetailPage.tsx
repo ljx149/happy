@@ -76,7 +76,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
             if (!active) return;
             cursor = page.messages.at(-1)?.seq ?? cursor;
             more = page.hasMore && page.messages.length > 0;
-            setMessages(current => [...current, ...decoded]);
+            setMessages(current => [...current, ...decoded.filter(message => message.text)]);
           }
           setLoaded(true);
           setSyncError('');

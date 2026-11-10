@@ -513,6 +513,8 @@ export async function runAcp(opts: {
     }
   }
 
+  session.updateMetadata(meta => ({ ...meta, agentName: opts.agentName, modelCatalogSource: opts.agentName === 'dsh' ? 'dsh-acp-profile' : 'acp-runtime' }));
+
   permissionHandler = new GenericAcpPermissionHandler(session, opts.agentName);
   // Drop any permission requests left in agent state from a previous CLI
   // process that died while a tool prompt was open — see the matching

@@ -1,3 +1,4 @@
+import { codexModelMetadata } from './modelCatalog';
 /**
  * Codex App Server Client — drives Codex via the v2 JSON-RPC protocol
  * (`codex app-server`), replacing the legacy MCP-based CodexMcpClient.
@@ -786,13 +787,22 @@ export class CodexAppServerClient {
 
     // ─── Thread management ──────────────────────────────────────
 
+    async getModelMetadata(cwd = process.cwd()) {
+        // Older app-servers may lack either method. Keep native startup usable.
+        const [config, models] = await Promise.all([
+            this.request('config/read', { includeLayers: false, cwd }, 10000).catch(() => null),
+            this.request('model/list', { limit: 100, includeHidden: false }, 10000).catch(() => null),
+        ]);
+        return codexModelMetadata(config, models);
+    }
+
     async startThread(opts: {
         model?: string;
         cwd?: string;
         approvalPolicy?: ApprovalPolicy;
         sandbox?: SandboxMode;
         mcpServers?: Record<string, unknown>;
-    }): Promise<{ threadId: string; model: string }> {
+    }): Promise<{ threadId: string; model: string; modelProvider?: string; reasoningEffort?: string | null }> {
         const params: NewConversationParams = {
             model: opts.model ?? null,
             modelProvider: null,
@@ -815,7 +825,7 @@ export class CodexAppServerClient {
         this.rawSubagentActivitySignaturesByItemId.clear();
         this.rememberThreadDefaults(opts);
         logger.debug('[CodexAppServer] Thread started:', this._threadId);
-        return { threadId: result.thread.id, model: result.model };
+        return { threadId: result.thread.id, model: result.model, modelProvider: result.modelProvider, reasoningEffort: result.reasoningEffort };
     }
 
     async resumeThread(opts?: {
@@ -825,7 +835,7 @@ export class CodexAppServerClient {
         approvalPolicy?: ApprovalPolicy;
         sandbox?: SandboxMode;
         mcpServers?: Record<string, unknown>;
-    }): Promise<{ threadId: string; model: string }> {
+    }): Promise<{ threadId: string; model: string; modelProvider?: string; reasoningEffort?: string | null }> {
         const threadId = opts?.threadId ?? this._threadId;
         if (!threadId) {
             throw new Error('No thread available to resume.');
@@ -857,7 +867,7 @@ export class CodexAppServerClient {
             mcpServers: opts?.mcpServers ?? defaults.mcpServers,
         });
         logger.debug('[CodexAppServer] Thread resumed:', this._threadId);
-        return { threadId: result.thread.id, model: result.model };
+        return { threadId: result.thread.id, model: result.model, modelProvider: result.modelProvider, reasoningEffort: result.reasoningEffort };
     }
 
     async forkThread(opts: {

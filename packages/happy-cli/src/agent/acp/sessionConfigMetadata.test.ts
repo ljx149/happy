@@ -182,3 +182,10 @@ describe('sessionConfigMetadata', () => {
     expect(extractConfigOptionsFromPayload({})).toBeNull();
   });
 });
+
+it('keeps provider identity in grouped DSH model labels and opaque selection IDs', () => {
+  const code = JSON.stringify(['personal-provider', 'local-model']);
+  const next = mergeAcpSessionConfigIntoMetadata(createBaseMetadata(), { configOptions: [{ type: 'select', id: 'model', name: 'Model', category: 'model', currentValue: code, options: [{ group: 'personal-provider', name: 'Personal provider', options: [{ value: code, name: 'Local model' }] }] }] });
+  expect(next.models).toEqual([{ code, value: 'Personal provider · Local model' }]);
+  expect(next.currentModelCode).toBe(code);
+});

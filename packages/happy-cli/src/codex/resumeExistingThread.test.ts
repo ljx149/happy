@@ -41,6 +41,9 @@ describe('resumeExistingThread', () => {
         expect(metadataHandlers[0]({ existing: true })).toEqual({
             existing: true,
             codexThreadId: '019ccca2-1a77-7481-9873-de72f3464372',
+            currentModelCode: 'gpt-5.4',
+            modelProvider: undefined,
+            currentThoughtLevelCode: undefined,
         });
         expect(messageBuffer.addMessage).toHaveBeenCalledWith(expect.stringContaining('Resumed thread'), 'status');
         expect(session.sendSessionEvent).toHaveBeenCalledWith({

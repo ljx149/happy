@@ -59,3 +59,13 @@ test('shows runner errors and failed turns instead of a silent chat', () => {
   expect(messageText({ role: 'session', content: { ev: { t: 'service', text: 'Missing provider API key' } } })).toBe('Missing provider API key');
   expect(messageText({ role: 'session', content: { ev: { t: 'turn-end', status: 'failed' } } })).toContain('执行失败');
 });
+
+ test('control events do not become chat bubbles, while tools and failures remain visible', () => {
+  const event = (ev: unknown) => ({ role: 'session', content: { ev } });
+  for (const t of ['start', 'stop', 'turn-start', 'tool-call-end']) expect(messageText(event({ t }))).toBe('');
+  expect(messageText(event({ t: 'turn-end', status: 'completed' }))).toBe('');
+  expect(messageText(event({ t: 'turn-end', status: 'cancelled' }))).toContain('取消');
+  expect(messageText(event({ t: 'tool-call-start', name: 'shell', title: '检查目录', description: '列出项目文件' }))).toContain('检查目录');
+  expect(messageText(event({ t: 'file', name: 'report.txt' }))).toContain('report.txt');
+  expect(messageText(event({ t: 'future-event' }))).toContain('future-event');
+ });

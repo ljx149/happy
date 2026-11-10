@@ -825,6 +825,8 @@ export async function runCodex(opts: {
         logger.debug('[codex]: client.connect begin');
         await client.connect();
         logger.debug('[codex]: client.connect done');
+        const modelMetadata = await client.getModelMetadata();
+        session.updateMetadata(meta => ({ ...meta, ...modelMetadata }));
 
         if (opts.resumeThreadId) {
             await resumeExistingThread({
@@ -961,6 +963,9 @@ export async function runCodex(opts: {
                     session.updateMetadata((currentMetadata) => ({
                         ...currentMetadata,
                         codexThreadId: startedThread.threadId,
+                        currentModelCode: startedThread.model,
+                        modelProvider: startedThread.modelProvider,
+                        currentThoughtLevelCode: startedThread.reasoningEffort ?? undefined,
                     }));
                 }
 
@@ -1003,6 +1008,11 @@ export async function runCodex(opts: {
                     effort: message.mode.effort,
                     extraInputItems: imageInputs.inputItems,
                 });
+                session.updateMetadata(meta => ({
+                    ...meta,
+                    currentModelCode: message.mode.model ?? meta.currentModelCode,
+                    currentThoughtLevelCode: message.mode.effort ?? meta.currentThoughtLevelCode,
+                }));
                 first = false;
                 if (includeAppendSystemPrompt) {
                     appendSystemPromptInjected = true;

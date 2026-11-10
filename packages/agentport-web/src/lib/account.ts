@@ -26,15 +26,21 @@ export function messageText(value: unknown): string {
   const content = field(value, 'content');
   const data = field(content, 'data');
   const event = field(content, 'ev');
-  if (field(event, 't') === 'turn-start') return 'Agent 正在处理…';
-  if (field(event, 't') === 'turn-end') return field(event, 'status') === 'failed' ? '本轮执行失败，请查看上方错误信息。' : '本轮处理结束。';
-  if (field(data, 'type') === 'ready') return 'Agent 已就绪。';
+  if (['turn-start', 'start', 'stop', 'tool-call-end'].includes(String(field(event, 't')))) return '';
+  if (field(event, 't') === 'tool-call-start') return `工具：${label(event, 'title') ?? label(event, 'name') ?? '执行操作'}${label(event, 'description') ? '\n' + label(event, 'description') : ''}`;
+  if (field(event, 't') === 'file') return `文件：${label(event, 'name') ?? label(event, 'ref') ?? '附件'}`;
+  if (field(event, 't') === 'turn-end') return field(event, 'status') === 'failed' ? '本轮执行失败，请查看上方错误信息。' : field(event, 'status') === 'cancelled' ? '本轮已取消。' : '';
+  if (['ready', 'usage', 'token_count'].includes(String(field(data, 'type')))) return '';
+  if (field(data, 'type') === 'system' && ['init', 'status'].includes(String(field(data, 'subtype')))) return '';
   const blocks = field(field(data, 'message'), 'content');
   if (Array.isArray(blocks)) {
     const text = blocks.filter(block => field(block, 'type') === 'text').map(block => label(block, 'text') ?? '').join('\n');
     if (text) return text;
+    const tools = blocks.filter(block => field(block, 'type') === 'tool_use').map(block => `工具：${label(block, 'name') ?? '执行操作'}`);
+    if (tools.length) return tools.join('\n');
+    if (blocks.every(block => ['thinking', 'redacted_thinking', 'tool_result'].includes(String(field(block, 'type'))))) return '';
   }
-  return label(content, 'text') ?? label(field(content, 'ev'), 'text') ?? label(data, 'text') ?? label(data, 'message') ?? label(field(data, 'message'), 'text') ?? '此消息类型暂不可显示。';
+  return label(content, 'text') ?? label(field(content, 'ev'), 'text') ?? label(data, 'text') ?? label(data, 'message') ?? label(field(data, 'message'), 'text') ?? `未识别的事件：${label(event, 't') ?? label(data, 'type') ?? label(content, 'type') ?? 'unknown'}`;
 }
 
 async function decodeSessionTitle(record: api.RecordSummary, account: Account, fallback: string) {

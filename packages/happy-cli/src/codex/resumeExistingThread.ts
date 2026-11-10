@@ -5,7 +5,7 @@ type ResumeThreadClient = {
         threadId: string;
         cwd: string;
         mcpServers: Record<string, unknown>;
-    }) => Promise<{ threadId: string; model: string }>;
+    }) => Promise<{ threadId: string; model: string; modelProvider?: string; reasoningEffort?: string | null }>;
 };
 
 type ResumeThreadSession = {
@@ -30,7 +30,7 @@ export async function resumeExistingThread(opts: {
      * internal resume detail out of the conversation. Defaults to `true`.
      */
     announce?: boolean;
-}): Promise<{ threadId: string; model: string }> {
+}): Promise<{ threadId: string; model: string; modelProvider?: string; reasoningEffort?: string | null }> {
     try {
         const resumedThread = await opts.client.resumeThread({
             threadId: opts.threadId,
@@ -41,6 +41,9 @@ export async function resumeExistingThread(opts: {
         opts.session.updateMetadata((currentMetadata) => ({
             ...currentMetadata,
             codexThreadId: resumedThread.threadId,
+            currentModelCode: resumedThread.model,
+            modelProvider: resumedThread.modelProvider,
+            currentThoughtLevelCode: resumedThread.reasoningEffort ?? undefined,
         }));
         opts.messageBuffer.addMessage(`Resumed thread ${trimIdent(resumedThread.threadId)}`, 'status');
         if (opts.announce !== false) {

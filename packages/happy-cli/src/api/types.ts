@@ -302,6 +302,10 @@ export type Metadata = {
   // `code` = protocol value ID, `value` = human label
   models?: Array<{ code: string; value: string; description?: string | null }>,
   currentModelCode?: string,
+  modelProvider?: string,
+  modelCatalogSource?: string,
+  modelReasoningEfforts?: Record<string, Array<{ code: string; value: string }>>,
+  agentName?: string,
   operatingModes?: Array<{ code: string; value: string; description?: string | null }>,
   currentOperatingModeCode?: string,
   thoughtLevels?: Array<{ code: string; value: string; description?: string | null }>,

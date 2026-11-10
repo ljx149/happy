@@ -60,7 +60,7 @@ function flattenConfigSelectOptions(options: unknown): MetadataOption[] {
         }
         flattened.push({
           code: grouped.value,
-          value: grouped.name,
+          value: typeof (entry as Record<string, unknown>).name === 'string' ? `${(entry as Record<string, unknown>).name} · ${grouped.name}` : grouped.name,
           ...(grouped.description !== undefined ? { description: grouped.description } : {}),
         });
       }
