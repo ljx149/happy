@@ -95,3 +95,6 @@ const prismaTarget = path.join(root, 'prisma');
 fs.rmSync(prismaTarget, { recursive: true, force: true });
 fs.cpSync(prismaSource, prismaTarget, { recursive: true });
 console.log(`Copied prisma/ from ${path.relative(root, prismaSource)}`);
+
+// Carry the Prisma 6/PGlite bytea compatibility patch into standalone installs.
+fs.copyFileSync(path.resolve(root, '../../patches/fix-pglite-prisma-bytes.cjs'), path.join(root, 'scripts/fix-pglite-prisma-bytes.cjs'));

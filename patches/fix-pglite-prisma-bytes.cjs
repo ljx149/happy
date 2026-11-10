@@ -12,6 +12,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const root = process.env.HAPPY_PATCH_ROOT || path.resolve(__dirname, '..');
+
 const files = [
     'node_modules/pglite-prisma-adapter/dist/index.mjs',
     'node_modules/pglite-prisma-adapter/dist/index.cjs',
@@ -22,7 +24,7 @@ const files = [
 let patched = 0;
 
 for (const file of files) {
-    const filePath = path.resolve(__dirname, '..', file);
+    const filePath = path.resolve(root, file);
     if (!fs.existsSync(filePath)) continue;
 
     let content = fs.readFileSync(filePath, 'utf8');

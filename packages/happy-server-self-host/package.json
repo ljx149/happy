@@ -26,6 +26,7 @@
     "dist",
     "prisma",
     "scripts/postinstall.cjs",
+    "scripts/fix-pglite-prisma-bytes.cjs",
     "package.json",
     "README.md"
   ],

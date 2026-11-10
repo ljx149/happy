@@ -3,3 +3,4 @@ dist/
 prisma/
 webapp/
 *.tgz
+scripts/fix-pglite-prisma-bytes.cjs

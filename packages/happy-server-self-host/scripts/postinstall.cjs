@@ -15,6 +15,15 @@ const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const schema = path.join(root, 'prisma', 'schema.prisma');
+const bytesPatch = path.join(root, 'scripts/fix-pglite-prisma-bytes.cjs');
+if (fs.existsSync(bytesPatch)) {
+  const patch = spawnSync(process.execPath, [bytesPatch], {
+    cwd: root, env: { ...process.env, HAPPY_PATCH_ROOT: root }, stdio: 'inherit',
+  });
+  if (patch.error) throw patch.error;
+  if (patch.status !== 0) process.exit(patch.status ?? 1);
+}
+
 
 if (!fs.existsSync(schema)) {
   console.log('happy-server-self-host: no prisma/schema.prisma yet, skipping generate (run build first).');

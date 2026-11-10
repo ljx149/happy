@@ -34,19 +34,18 @@ function routeName(): string {
 }
 
 async function loadMachines(token: string): Promise<Array<{ id: string; hostname: string; online: boolean }>> {
-    try {
-        const res = await fetch(`${cfg.baseUrl}/v1/machines`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.status === 401) { store.handleUnauthorized(); void render(); return []; }
-        if (!res.ok) return [];
-        const machines = (await res.json()) as Array<{ id: string; metadata?: string; active?: boolean; activeAt?: number }>;
-            return machines.map(m => ({
-            id: m.id,
-            hostname: `设备 ${m.id.slice(0, 8)}（名称尚未解密）`,
-            online: m.active === true,
-        }));
-    } catch {
-        return [];
+    const res = await fetch(`${cfg.baseUrl}/v1/machines`, { headers: { Authorization: `Bearer ${token}` } });
+    if (res.status === 401) {
+        store.handleUnauthorized();
+        throw new Error('登录已失效，请重新恢复账户。');
     }
+    if (!res.ok) throw new Error(`无法读取设备列表（HTTP ${res.status}）。请重试，无需重复配对。`);
+    const machines = (await res.json()) as Array<{ id: string; active?: boolean }>;
+    return machines.map(m => ({
+        id: m.id,
+        hostname: `设备 ${m.id.slice(0, 8)}（名称尚未解密）`,
+        online: m.active === true,
+    }));
 }
 
 async function render() {
@@ -95,7 +94,15 @@ async function render() {
     // signedIn
     layout.classList.add('workspace');
     sidebar.hidden = false;
-    const machines = await loadMachines(s.token);
+    let machines: Awaited<ReturnType<typeof loadMachines>>;
+    try {
+        machines = await loadMachines(s.token);
+    } catch (error) {
+        if (store.getState() !== s || routeName() !== requested) return;
+        sidebar.innerHTML = '';
+        screen.innerHTML = `<div class="page"><h1>设备列表暂时不可用</h1><p role="alert">${escapeHtml(error instanceof Error ? error.message : '网络错误，请重试。')}</p><button data-action="refresh-devices">重新加载设备</button></div>`;
+        return;
+    }
     if (store.getState() !== s || routeName() !== requested) return;
 
     sidebar.innerHTML = `<nav aria-label="工作台导航">
@@ -179,7 +186,7 @@ function homeTemplate(machines: Array<{ id: string; hostname: string; online: bo
             <div class="stack">
                 <section class="panel">
                     <div class="section-head"><h2>设备</h2><a class="back" href="#devices">管理 ›</a></div>
-                    ${machines.length ? machines.map(m => `<div class="row"><span>${escapeHtml(m.hostname)}<small>本地执行</small></span><span class="status ${m.online ? 'online' : ''}">${m.online ? '● 在线' : '离线'}</span></div>`).join('') : '<p>尚未连接电脑。运行 <code>happy auth login</code> 并在浏览器确认。</p>'}
+                    ${machines.length ? machines.map(m => `<div class="row"><span>${escapeHtml(m.hostname)}<small>本地执行</small></span><span class="status ${m.online ? 'online' : ''}">${m.online ? '● 在线' : '离线'}</span></div>`).join('') : '<p>暂无已注册设备。如果刚完成授权，请在运行 CLI 的电脑启动 <code>agentport daemon start</code>，然后刷新本页；无需重复登录。</p>'}
                 </section>
             </div>
         </div>`;
@@ -214,7 +221,7 @@ async function pairTemplate(s: AuthState): Promise<string> {
                     <p>在电脑终端运行以下命令，再在浏览器中确认连接。</p>
                 </div>
                 <section class="panel stack">
-                    <code class="readout">happy auth login</code>
+                    <code class="readout">agentport auth login</code>
                     <p>CLI 会生成一个 <code>/terminal/connect#key=…</code> 链接。打开它进入确认。</p>
                     <div class="actions"><a class="button" href="#home">返回工作台</a></div>
                 </section>
@@ -225,7 +232,7 @@ async function pairTemplate(s: AuthState): Promise<string> {
     let canApprove = false;
     try {
         const st = await getTerminalAuthStatus(cliPub, cfg);
-        if (st.status === 'not_found') statusText = '请求不存在或已过期。请在电脑上重新运行 <code>happy auth login</code>。';
+        if (st.status === 'not_found') statusText = '请求不存在或已过期。请在电脑上重新运行 <code>agentport auth login</code>。';
         else if (st.status === 'authorized') statusText = '该请求已被授权。';
         else {
             canApprove = st.supportsV2;
@@ -259,7 +266,9 @@ screen.addEventListener('click', async event => {
     const action = event.target instanceof Element ? (event.target.closest('[data-action]') as HTMLElement | null)?.dataset.action : undefined;
     const statusEl = () => screen.querySelector('#restore-status, #pair-status') as HTMLElement | null;
 
-    if (action === 'create') {
+    if (action === 'refresh-devices') {
+        await render();
+    } else if (action === 'create') {
         try {
             await store.createAccount();
             location.hash = pendingPairKey ? '#pair' : '#home';
