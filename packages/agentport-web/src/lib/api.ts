@@ -6,6 +6,7 @@ export interface RecordSummary {
   active: boolean;
   metadata: string;
   dataEncryptionKey: string | null;
+  agentState?: string | null;
 }
 
 export class ApiError extends Error {
