@@ -1,19 +1,19 @@
 {
-  "name": "happy",
+  "name": "agentport-cli",
   "version": "1.2.6",
-  "description": "Mobile and Web client for Claude Code and Codex",
+  "description": "AgentPort remote coding-agent platform CLI",
   "author": "Kirill Dubovitskiy",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://happy.engineering",
-  "bugs": "https://github.com/slopus/happy/issues",
+  "homepage": "https://agent.xcodex.vip",
+  "bugs": "https://github.com/ljx149/happy/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/slopus/happy"
+    "url": "https://github.com/ljx149/happy"
   },
   "bin": {
-    "happy": "./bin/happy.mjs",
-    "happy-mcp": "./bin/happy-mcp.mjs"
+    "agentport": "./bin/happy.mjs",
+    "agentport-mcp": "./bin/happy-mcp.mjs"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
