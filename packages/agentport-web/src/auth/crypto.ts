@@ -113,6 +113,13 @@ export function authChallenge(secret: Uint8Array, random?: (size: number) => Uin
     return { challenge, publicKey: keypair.publicKey, signature };
 }
 
+/** Decode a base64url string to a 32-byte secret. Throws if not exactly 32 bytes. */
+export function decodeBase64Url(secret: string): Uint8Array {
+    const bytes = decodeBase64(secret, 'base64url');
+    if (bytes.length !== 32) throw new Error(`Expected 32 bytes, got ${bytes.length}`);
+    return bytes;
+}
+
 /** SHA-512 of `data`, first 32 bytes. Used for content-key derivation (V2). */
 export async function sha512First32(data: Uint8Array): Promise<Uint8Array> {
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-512', data as BufferSource));

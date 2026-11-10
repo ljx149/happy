@@ -1,5 +1,6 @@
 import { getToken, verifyToken, AuthError, AuthServerConfig } from './authClient';
 import { format, normalize } from './backup';
+import { decodeBase64Url } from './crypto';
 import {
     readStoredCredentials, writeStoredCredentials, clearStoredCredentials,
     deriveKeyFromPhrase, encryptSecret, decryptSecret,
@@ -103,7 +104,7 @@ export class AuthStore {
                 this.setState({ phase: 'error', message: 'Invalid recovery key format', retryable: false });
                 throw new Error('Invalid recovery key format');
             }
-            const secret = Uint8Array.from(atob(secretBase64Url.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - secretBase64Url.length % 4) % 4)), c => c.charCodeAt(0));
+            const secret = decodeBase64Url(secretBase64Url);
             try {
                 const token = await getToken(secret, this.cfg);
                 const ok = await verifyToken(token, this.cfg);
@@ -140,7 +141,7 @@ export class AuthStore {
                 this.setState({ phase: 'error', message: 'Wrong unlock phrase', retryable: true });
                 throw new Error('Wrong unlock phrase');
             }
-            const secret = Uint8Array.from(atob(secretBase64Url.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - secretBase64Url.length % 4) % 4)), c => c.charCodeAt(0));
+            const secret = decodeBase64Url(secretBase64Url);
             try {
                 const token = await getToken(secret, this.cfg);
                 const ok = await verifyToken(token, this.cfg);
