@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101720">
+  <title>AgentPort · 远程开发工作台</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#home" aria-label="AgentPort 工作台">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 6 6 6-6 6m9 0h6"/></svg>AgentPort
+    </a>
+    <span class="demo">UI 预览 · 演示数据</span>
+    <button id="account" class="quiet" hidden>账户</button>
+  </header>
+  <div id="layout" class="layout">
+    <aside id="sidebar" class="sidebar" hidden aria-label="工作台导航"></aside>
+    <main id="screen" tabindex="-1"></main>
+  </div>
+  <template id="login-template">
+    <div class="auth hero">
+      <span class="eyebrow">REMOTE DEVELOPMENT</span>
+      <h1>电脑上的开发，<br>在这里继续。</h1>
+      <p>连接你的电脑，在浏览器里启动 Codex 或 Claude Code，查看进度和处理工具审批。</p>
+      <div class="actions"><button data-action="enter" class="primary">创建账户 ↗</button><a class="button" href="#restore">恢复账户</a></div>
+      <p class="fine">当前是交互预览，账户操作仅使用演示身份。</p>
+    </div>
+  </template>
+  <template id="restore-template">
+    <div class="auth hero">
+      <a class="back" href="#login">‹ 返回登录</a>
+      <span class="eyebrow">ACCOUNT RECOVERY</span>
+      <h1>恢复账户</h1>
+      <p>恢复账户后，可在此浏览器继续查看已有设备和会话。</p>
+      <div class="panel stack">
+        <span class="label">恢复凭据</span>
+        <div class="readout">•••• •••• •••• ••••</div>
+        <p class="fine">预览使用示例身份，请勿输入真实恢复凭据。</p>
+        <button data-action="enter" class="primary">恢复演示账户</button>
+      </div>
+    </div>
+  </template>
+</body>
+</html>
