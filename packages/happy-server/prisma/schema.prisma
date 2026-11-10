@@ -201,6 +201,20 @@ model RepeatKey {
     expiresAt DateTime
 }
 
+// A permanent revocation of an auth token subject. `subject` is the stable
+// identifier of what is being revoked and `scope` says at which level:
+//   - "session": subject is the token's jti (its embedded uuid) — kills one session
+//   - "device":  subject is the pairing session id (the token's extras.session) — kills the token(s) issued to one device via that pairing
+//   - "account": subject is the account id — kills every token for the account
+// Revocations never expire: a revoked subject stays revoked, which is the
+// security guarantee the in-memory cache alone cannot provide (clearing the
+// cache still leaves the cryptographically valid token verifiable).
+model TokenRevocation {
+    subject   String   @id
+    scope     String
+    createdAt DateTime @default(now())
+}
+
 model SimpleCache {
     key       String   @id
     value     String
