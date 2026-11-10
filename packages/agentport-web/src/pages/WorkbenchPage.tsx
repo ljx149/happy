@@ -24,7 +24,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
   const [machineId, setMachineId] = useState('');
   const [agent, setAgent] = useState('claude');
   const [directory, setDirectory] = useState('');
-  const [directoryPending, setDirectoryPending] = useState<{ machineId: string; agent: string; directory: string; approvalPath: string } | null>(null);
+  const [directoryPending, setDirectoryPending] = useState<{ machineId: string; deviceTitle: string; agent: string; directory: string; approvalPath: string } | null>(null);
   const [deviceSupport, setDeviceSupport] = useState<Record<string, DeviceAgentSupport>>({});
   const [spawnBusy, setSpawnBusy] = useState(false);
   const [spawnResult, setSpawnResult] = useState<SpawnInterpretation | null>(null);
@@ -129,7 +129,8 @@ export function WorkbenchPage({ account }: { account: Account }) {
       if (interpretation.kind === 'success') {
         location.hash = `#session/${interpretation.sessionId}`;
       } else if (interpretation.kind === 'directory-approval') {
-        setDirectoryPending({ machineId: req.machineId, agent: req.agent, directory: req.directory, approvalPath: interpretation.directory });
+        const deviceTitle = records?.devices.find(d => d.id === req.machineId)?.title ?? req.machineId;
+        setDirectoryPending({ machineId: req.machineId, deviceTitle, agent: req.agent, directory: req.directory, approvalPath: interpretation.directory });
       } else if (interpretation.kind === 'error') {
         spawnedRef.current = false;
         setSpawnError(interpretation.message);
@@ -226,7 +227,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
           {!spawnBusy && spawnResult?.kind === 'unknown' && <p role="status">启动结果未知，请核对下方会话列表后再决定是否重试。</p>}
           {spawnError && !spawnBusy && <p role="alert" className="pending">{spawnError}</p>}
           {directoryPending && !spawnBusy ? <form className="composer" onSubmit={confirmDirectoryCreation}>
-            <p>在 <strong>{directoryPending.approvalPath}</strong>（{directoryPending.agent}）创建目录并启动会话？</p>
+            <p>在电脑 <strong>{directoryPending.deviceTitle}</strong> 的 <strong>{directoryPending.approvalPath}</strong> 创建目录并启动 {directoryPending.agent} 会话？</p>
             <button className="primary" type="submit">确认创建</button>
             <button type="button" onClick={resetSpawn}>取消</button>
           </form> : <form className="composer spawn-form" onSubmit={submitSpawn}>

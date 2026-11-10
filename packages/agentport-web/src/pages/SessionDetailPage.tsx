@@ -181,9 +181,10 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
         const busy = resolvingIds.has(req.id);
         const submitted = submittedIds.has(req.id);
         const args = typeof req.arguments === 'object' && req.arguments ? JSON.stringify(req.arguments, null, 2) : '';
+        const unsupported = typeof req.tool !== 'string' || !req.tool.trim();
         return <div className="perm" key={req.id}>
-          <p>{req.tool ?? '未知工具'}</p>
-          {args && <details className="perm-args"><summary>查看完整参数</summary><pre>{args}</pre></details>}
+          <p>{unsupported ? '此审批请求的格式暂不支持' : req.tool}</p>
+          {args && <details className="perm-args" open={unsupported}><summary>查看完整参数</summary><pre>{args}</pre></details>}
           <div className="perm-actions">
             <button className="primary" onClick={() => resolvePermission(req.id, true)} disabled={busy}>{busy ? '提交中…' : submitted ? '已提交，等待确认' : '允许一次'}</button>
             <button onClick={() => resolvePermission(req.id, false)} disabled={busy}>{busy ? '提交中…' : '拒绝'}</button>
