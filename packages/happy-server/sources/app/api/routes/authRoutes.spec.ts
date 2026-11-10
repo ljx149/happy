@@ -213,15 +213,15 @@ describe("POST /v1/auth — versioned exchange with replay protection", () => {
 });
 
 describe("GET /v1/auth/request/status", () => {
-    it("reports not_found for malformed base64 rather than 500", async () => {
+    it("returns 400 for malformed base64 rather than 500", async () => {
         const app = await buildApp();
         const res = await app.inject({
             method: "GET",
             url: "/v1/auth/request/status",
             query: { publicKey: "!!not-base64!!" },
         });
-        expect(res.statusCode).toBe(200);
-        expect(res.json().status).toBe("not_found");
+        expect(res.statusCode).toBe(400);
+        expect(res.json().error).toBe("Invalid public key");
     });
 });
 

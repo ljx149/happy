@@ -188,7 +188,7 @@ export function authRoutes(app: Fastify) {
         const tweetnacl = await loadTweetnacl();
         const publicKey = decodeBase64Field(request.query.publicKey);
         if (!publicKey || tweetnacl.box.publicKeyLength !== publicKey.length) {
-            return reply.send({ status: 'not_found', supportsV2: false });
+            return reply.code(400).send({ error: 'Invalid public key' });
         }
 
         const status = await getTerminalAuthStatus(privacyKit.encodeHex(publicKey));
