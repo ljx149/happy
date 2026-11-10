@@ -185,7 +185,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
         const busy = resolvingIds.has(req.id);
         const submitted = submittedIds.has(req.id);
         const args = typeof req.arguments === 'object' && req.arguments ? JSON.stringify(req.arguments, null, 2) : '';
-        const unsupported = typeof req.tool !== 'string' || !req.tool.trim();
+        const unsupported = typeof req.tool !== 'string' || !req.tool.trim() || /^(unknown tool|unknown|other)$/i.test(req.tool);
         return <div className="perm" key={req.id}>
           <p>{unsupported ? '此审批请求的格式暂不支持' : req.tool}</p>
           {args && <details className="perm-args" open={unsupported}><summary>查看完整参数</summary><pre>{args}</pre></details>}

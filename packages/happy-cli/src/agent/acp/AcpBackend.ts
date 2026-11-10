@@ -1,3 +1,4 @@
+import { PermissionDetails, permissionOption } from './permissionDetails';
 /**
  * AcpBackend - Agent Client Protocol backend using official SDK
  *
@@ -316,6 +317,7 @@ async function withRetry<T>(
  */
 export class AcpBackend implements AgentBackend {
   private listeners: AgentMessageHandler[] = [];
+  private permissionDetails = new PermissionDetails();
   private process: ChildProcess | null = null;
   private connection: ClientSideConnection | null = null;
   private acpSessionId: string | null = null;
@@ -568,21 +570,12 @@ export class AcpBackend implements AgentBackend {
           
           const extendedParams = params as ExtendedRequestPermissionRequest;
           const toolCall = extendedParams.toolCall;
-          let toolName = toolCall?.kind || toolCall?.toolName || extendedParams.kind || 'Unknown tool';
-          // Use toolCallId as the single source of truth for permission ID
-          // This ensures mobile app sends back the same ID that we use to store pending requests
-          const toolCallId = toolCall?.id || randomUUID();
-          const permissionId = toolCallId; // Use same ID for consistency!
-          
-          // Extract input/arguments from various possible locations FIRST (before checking toolName)
-          let input: Record<string, unknown> = {};
-          if (toolCall) {
-            input = toolCall.input || toolCall.arguments || toolCall.content || {};
-          } else {
-            // If no toolCall, try to extract from params directly
-            input = extendedParams.input || extendedParams.arguments || extendedParams.content || {};
-          }
-          
+          const details = this.permissionDetails.resolve(extendedParams as unknown as Record<string, unknown>, randomUUID());
+          let toolName = details.toolName;
+          const toolCallId = details.id;
+          const permissionId = toolCallId;
+          const input = details.input;
+
           // If toolName is "other" or "Unknown tool", try to determine real tool name
           const context: ToolNameContext = {
             recentPromptHadChangeTitle: this.recentPromptHadChangeTitle,
@@ -639,27 +632,9 @@ export class AcpBackend implements AgentBackend {
               
               // Map permission decision to ACP response
               // ACP uses optionId from the request options
-              let optionId = 'cancel'; // Default to cancel/deny
-              
-              if (result.decision === 'approved' || result.decision === 'approved_for_session') {
-                // Find the appropriate optionId from the request options
-                // Look for 'proceed_once' or 'proceed_always' in options
-                const proceedOnceOption = options.find((opt: any) => 
-                  opt.optionId === 'proceed_once' || opt.name?.toLowerCase().includes('once')
-                );
-                const proceedAlwaysOption = options.find((opt: any) => 
-                  opt.optionId === 'proceed_always' || opt.name?.toLowerCase().includes('always')
-                );
-                
-                if (result.decision === 'approved_for_session' && proceedAlwaysOption) {
-                  optionId = proceedAlwaysOption.optionId || 'proceed_always';
-                } else if (proceedOnceOption) {
-                  optionId = proceedOnceOption.optionId || 'proceed_once';
-                } else if (options.length > 0) {
-                  // Fallback to first option if no specific match
-                  optionId = options[0].optionId || 'proceed_once';
-                }
-                
+              const approved = result.decision === 'approved' || result.decision === 'approved_for_session';
+              const optionId = permissionOption(options, approved, result.decision === 'approved_for_session');
+              if (approved) {
                 // Emit tool-result with permissionId so UI can close the timer
                 // This is needed because tool_call_update comes with a different ID
                 this.emit({
@@ -669,14 +644,6 @@ export class AcpBackend implements AgentBackend {
                   callId: permissionId,
                 });
               } else {
-                // Denied or aborted - find cancel option
-                const cancelOption = options.find((opt: any) => 
-                  opt.optionId === 'cancel' || opt.name?.toLowerCase().includes('cancel')
-                );
-                if (cancelOption) {
-                  optionId = cancelOption.optionId || 'cancel';
-                }
-                
                 // Emit tool-result for denied/aborted
                 this.emit({
                   type: 'tool-result',
@@ -686,7 +653,7 @@ export class AcpBackend implements AgentBackend {
                 });
               }
               
-              return { outcome: { outcome: 'selected', optionId } };
+              return optionId ? { outcome: { outcome: 'selected', optionId } } : { outcome: { outcome: 'cancelled' } };
             } catch (error) {
               // Log to file only, not console
               logger.debug('[AcpBackend] Error in permission handler:', error);
@@ -935,6 +902,7 @@ export class AcpBackend implements AgentBackend {
       return;
     }
 
+    this.permissionDetails.remember(update as unknown as Record<string, unknown>);
     const sessionUpdateType = update.sessionUpdate;
     const updateType = sessionUpdateType as string | undefined;
 
