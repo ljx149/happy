@@ -118,6 +118,38 @@ code, .readout { font-family: ui-monospace, monospace; overflow-wrap: anywhere; 
   align-items: end;
 }
 .composer textarea { resize: vertical; max-height: 140px; }
+.spawn-form {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.spawn-form input { grid-column: 1 / -1; }
+.spawn-form .primary { grid-column: 1 / -1; }
+.hint { grid-column: 1 / -1; font-size: .78rem; color: var(--pending); margin: 0; }
+.perm-list { display: grid; gap: 10px; }
+.perm {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #2a2a20;
+  border: 1px solid #ffd49555;
+}
+.perm p { color: var(--text); font-weight: 600; }
+.perm .perm-args { margin: 8px 0; }
+.perm .perm-args summary { color: var(--muted); font-size: .8rem; cursor: pointer; }
+.perm .perm-args pre {
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: #101720;
+  border: 1px solid var(--line);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.perm-actions { display: flex; gap: 8px; margin-top: 10px; }
+@media (max-width: 480px) {
+  .spawn-form { grid-template-columns: 1fr; }
+}
 @media (min-width: 740px) {
   .layout.workspace { display: grid; grid-template-columns: clamp(205px, 26vw, 296px) minmax(0, 1fr); }
   .sidebar { position: sticky; top: 0; height: calc(100dvh - 64px); }

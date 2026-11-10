@@ -335,6 +335,16 @@ export async function startDaemon(): Promise<void> {
         }
         const agentLabel = options.agent ?? 'claude';
 
+        // Pre-flight: DSH has no bundled runtime, so a missing `dsh` on PATH
+        // produces a generic spawn failure downstream. Fail early with an
+        // actionable message instead.
+        if (agentLabel === 'dsh' && !detectCLIAvailability().dsh) {
+          return {
+            type: 'error',
+            errorMessage: '未在 PATH 中找到 dsh（DeepSeek Harness）。请先安装 @deepseek-ai/dsh 并确保 `dsh` 可执行后重试。',
+          };
+        }
+
         // Build environment variables for session spawning
         // Authentication tokens are resolved here
 

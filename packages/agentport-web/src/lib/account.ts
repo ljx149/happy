@@ -3,6 +3,12 @@ import type * as api from './api.ts';
 
 export type Account = { token: string; keys: Awaited<ReturnType<typeof contentKeys>> };
 
+export interface DeviceAgentSupport {
+  claude: boolean;
+  codex: boolean;
+  dsh: boolean;
+}
+
 export function field(value: unknown, name: string): unknown {
   return typeof value === 'object' && value !== null ? Reflect.get(value, name) : undefined;
 }
@@ -37,4 +43,29 @@ async function decodeSessionTitle(record: api.RecordSummary, account: Account, f
 
 export async function sessionSummaries(records: api.RecordSummary[], account: Account, fallback: string) {
   return Promise.all(records.map(record => decodeSessionTitle(record, account, fallback)));
+}
+
+/**
+ * Decrypt a device's metadata and report which agents it advertises as
+ * available. Legacy (no dataEncryptionKey) machines and anything that fails
+ * to decrypt or parse are treated as supporting nothing rather than throwing,
+ * so the caller can hide each agent option per-device instead of guessing.
+ */
+export async function deviceAgentSupport(record: api.RecordSummary, contentSecretKey: Uint8Array): Promise<DeviceAgentSupport> {
+  const unsupported: DeviceAgentSupport = { claude: false, codex: false, dsh: false };
+  if (!record.dataEncryptionKey) return unsupported;
+  let metadata: unknown;
+  try {
+    const key = unwrapKey(record.dataEncryptionKey, contentSecretKey);
+    metadata = await decryptRecord(record.metadata, key);
+  } catch {
+    return unsupported;
+  }
+  const availability = field(metadata, 'cliAvailability');
+  if (!availability) return unsupported;
+  return {
+    claude: field(availability, 'claude') === true,
+    codex: field(availability, 'codex') === true,
+    dsh: field(availability, 'dsh') === true,
+  };
 }

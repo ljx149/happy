@@ -21,6 +21,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
   const [permRequests, setPermRequests] = useState<Array<{ id: string; tool?: string; arguments?: unknown; createdAt?: number }>>([]);
   const [permError, setPermError] = useState('');
   const [resolvingIds, setResolvingIds] = useState<Set<string>>(new Set());
+  const [submittedIds, setSubmittedIds] = useState<Set<string>>(new Set());
   const socketRef = useRef<Socket | null>(null);
   const pendingPermIds = useRef<Set<string>>(new Set());
 
@@ -87,8 +88,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
         if (!record?.agentState || !record.dataEncryptionKey) { setPermRequests([]); return; }
         const key = unwrapKey(record.dataEncryptionKey, account.keys.secretKey);
         const state = await decryptRecord(record.agentState, key);
-        const pending = extractPendingRequests(state).filter(p => !pendingPermIds.current.has(p.id));
-        if (pending.length) setPermRequests(current => [...current, ...pending]);
+        setPermRequests(extractPendingRequests(state));
       } catch {
         // agentState may be null or decrypt fail; leave requests untouched
       }
@@ -99,7 +99,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
       const body = field(update, 'body');
       const type = field(body, 't');
       if (type === 'new-message' && field(body, 'sid') === id) void sync();
-      if (type === 'update-session' && field(body, 'sessionId') === id && field(field(body, 'agentState'), 'value')) void syncPermissions();
+      if (type === 'update-session' && field(body, 'id') === id && field(field(body, 'agentState'), 'value')) void syncPermissions();
     });
     socketRef.current = socket;
     return () => { active = false; socket.disconnect(); socketRef.current = null; };
@@ -130,6 +130,7 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
   async function resolvePermission(requestId: string, approved: boolean) {
     if (pendingPermIds.current.has(requestId)) return;
     pendingPermIds.current.add(requestId);
+    setResolvingIds(current => new Set(current).add(requestId));
     setPermError('');
     try {
       const records = await api.sessions(account.token);
@@ -140,19 +141,25 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
       const encrypted = await encodePermissionPayload(payload, key);
       const socket = socketRef.current;
       if (!socket) throw new Error('连接未建立。');
-      const ack: { ok: boolean; result?: string; error?: string } = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('审批超时。')), 15_000);
-        socket.timeout(15_000).emitWithAck('rpc-call', { method: permissionRpcMethod(id), params: encrypted }, (err: unknown, res: any) => {
-          clearTimeout(timeout);
-          if (err) reject(new Error(errorText(err)));
-          else resolve(res);
-        });
-      });
+      if (!socket.connected) throw new Error('连接已断开，请刷新后重试。');
+      let ack: { ok: boolean; result?: string; error?: string };
+      try {
+        ack = await socket.timeout(15_000).emitWithAck('rpc-call', { method: permissionRpcMethod(id), params: encrypted });
+      } catch {
+        // Timeout: the decision's fate is unknown. Keep the card; the user re-checks.
+        throw new Error('审批超时，结果未知，请稍后以会话状态为准。');
+      }
       if (!ack.ok) throw new Error(ack.error ?? '审批请求被拒绝。');
-      setPermRequests(current => current.filter(p => p.id !== requestId));
+      // Ack only means the call returned. The final approval state comes from the
+      // agent state, which syncPermissions reconciles. Clear the in-flight guard so a
+      // re-raised request (Codex sandbox escalation) can be submitted again, and let
+      // the card disappear only when agentState.requests drops it.
+      setSubmittedIds(current => new Set(current).add(requestId));
     } catch (error) {
-      pendingPermIds.current.delete(requestId);
       setPermError(errorText(error));
+    } finally {
+      pendingPermIds.current.delete(requestId);
+      setResolvingIds(current => { const next = new Set(current); next.delete(requestId); return next; });
     }
   }
 
@@ -170,13 +177,19 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
       </div>)}
     </div>
     {permRequests.length > 0 && !legacy && <div className="perm-list" aria-label="待审批请求" aria-live="polite">
-      {permRequests.map(req => <div className="perm" key={req.id}>
-        <p>{req.tool ?? '未知工具'} · {typeof req.arguments === 'object' && req.arguments ? JSON.stringify(req.arguments).slice(0, 120) : ''}</p>
-        <div className="perm-actions">
-          <button className="primary" onClick={() => resolvePermission(req.id, true)} disabled={pendingPermIds.current.has(req.id)}>允许一次</button>
-          <button onClick={() => resolvePermission(req.id, false)} disabled={pendingPermIds.current.has(req.id)}>拒绝</button>
-        </div>
-      </div>)}
+      {permRequests.map(req => {
+        const busy = resolvingIds.has(req.id);
+        const submitted = submittedIds.has(req.id);
+        const args = typeof req.arguments === 'object' && req.arguments ? JSON.stringify(req.arguments, null, 2) : '';
+        return <div className="perm" key={req.id}>
+          <p>{req.tool ?? '未知工具'}</p>
+          {args && <details className="perm-args"><summary>查看完整参数</summary><pre>{args}</pre></details>}
+          <div className="perm-actions">
+            <button className="primary" onClick={() => resolvePermission(req.id, true)} disabled={busy}>{busy ? '提交中…' : submitted ? '已提交，等待确认' : '允许一次'}</button>
+            <button onClick={() => resolvePermission(req.id, false)} disabled={busy}>{busy ? '提交中…' : '拒绝'}</button>
+          </div>
+        </div>;
+      })}
     </div>}
     {permError && <p role="alert" className="pending">{permError}</p>}
     {sendError && <p role="alert" className="pending">{sendError}</p>}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { io, type Socket } from 'socket.io-client';
 import * as api from '../lib/api.ts';
-import { errorText, field, sessionSummaries, type Account } from '../lib/account.ts';
+import { errorText, field, sessionSummaries, deviceAgentSupport, type Account, type DeviceAgentSupport } from '../lib/account.ts';
 import { unwrapKey } from '../lib/protocol.ts';
 import {
   buildSpawnParams,
@@ -14,15 +14,18 @@ import {
 
 type Summary = api.RecordSummary & { title: string };
 
-type Device = api.RecordSummary & { title: string; agent: string };
+type Device = api.RecordSummary & { title: string };
+
+type DeviceState = Device & { decryptable: boolean };
 
 export function WorkbenchPage({ account }: { account: Account }) {
-  const [records, setRecords] = useState<{ sessions: Summary[]; devices: Device[] }>();
+  const [records, setRecords] = useState<{ sessions: Summary[]; devices: DeviceState[] }>();
   const [error, setError] = useState('');
   const [machineId, setMachineId] = useState('');
   const [agent, setAgent] = useState('claude');
   const [directory, setDirectory] = useState('');
-  const [directoryPending, setDirectoryPending] = useState<string | null>(null);
+  const [directoryPending, setDirectoryPending] = useState<{ machineId: string; agent: string; directory: string; approvalPath: string } | null>(null);
+  const [deviceSupport, setDeviceSupport] = useState<Record<string, DeviceAgentSupport>>({});
   const [spawnBusy, setSpawnBusy] = useState(false);
   const [spawnResult, setSpawnResult] = useState<SpawnInterpretation | null>(null);
   const [spawnError, setSpawnError] = useState('');
@@ -38,12 +41,18 @@ export function WorkbenchPage({ account }: { account: Account }) {
     async function refresh() {
       try {
         const [sessions, machines] = await Promise.all([api.sessions(account.token), api.machines(account.token)]);
-        const [sessionList, devices] = await Promise.all([
-          sessionSummaries(sessions.sessions, account, '会话'),
-          sessionSummaries(machines, account, '电脑'),
-        ]);
+        const sessionList = await sessionSummaries(sessions.sessions, account, '会话');
+        const deviceList = await Promise.all(machines.map(async machine => {
+          const support = machine.dataEncryptionKey
+            ? await deviceAgentSupport(machine, account.keys.secretKey)
+            : { claude: false, codex: false, dsh: false };
+          return { ...machine, title: machine.id.slice(0, 8), decryptable: !!machine.dataEncryptionKey, support } as DeviceState;
+        }));
         if (active) {
-          setRecords({ sessions: sessionList, devices: devices as Device[] });
+          const supportMap: Record<string, DeviceAgentSupport> = {};
+          for (const device of deviceList) supportMap[device.id] = (device as any).support;
+          setDeviceSupport(supportMap);
+          setRecords({ sessions: sessionList, devices: deviceList });
           setError('');
         }
       } catch (error) {
@@ -63,7 +72,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
   }, [account]);
 
   const availableDevices = useMemo(
-    () => records?.devices.filter(device => device.active && device.dataEncryptionKey != null) ?? [],
+    () => records?.devices.filter(device => device.active && device.decryptable) ?? [],
     [records],
   );
 
@@ -77,9 +86,9 @@ export function WorkbenchPage({ account }: { account: Account }) {
     }
   }
 
-  async function doSpawn(machineId: string, approvedNewDirectoryCreation: boolean) {
-    if (!machineId || !directory.trim()) return;
-    const machineKey = machineKeyFor(machineId);
+  async function doSpawn(req: { machineId: string; agent: string; directory: string; approvedNewDirectoryCreation: boolean }) {
+    if (!req.machineId || !req.directory.trim()) return;
+    const machineKey = machineKeyFor(req.machineId);
     if (!machineKey) {
       setSpawnError('设备密钥不可用，无法加密启动参数。');
       return;
@@ -93,18 +102,25 @@ export function WorkbenchPage({ account }: { account: Account }) {
     setSpawnError('');
     try {
       const encrypted = await encodeSpawnParams(
-        buildSpawnParams({ directory: directory.trim(), agent, approvedNewDirectoryCreation }),
+        buildSpawnParams({ directory: req.directory.trim(), agent: req.agent, approvedNewDirectoryCreation: req.approvedNewDirectoryCreation }),
         machineKey,
       );
-      const ack: { ok: boolean; result?: string; error?: string } = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('启动超时，结果未知。请刷新会话列表。')), 30_000);
-        socket.timeout(30_000).emitWithAck('rpc-call', { method: spawnRpcMethod(machineId), params: encrypted }, (err: unknown, res: any) => {
-          clearTimeout(timeout);
-          if (err) reject(new Error(errorText(err)));
-          else resolve(res);
-        });
-      });
+      if (!socket.connected) {
+        throw new Error('连接已断开，请刷新后重试。');
+      }
+      let ack: { ok: boolean; result?: string; error?: string };
+      try {
+        ack = await socket.timeout(30_000).emitWithAck('rpc-call', { method: spawnRpcMethod(req.machineId), params: encrypted });
+      } catch {
+        // Timeout: result unknown. Never auto-retry; refresh and ask the user to verify.
+        spawnedRef.current = false;
+        setSpawnResult({ kind: 'unknown', raw: null });
+        setSpawnError('启动结果未知，请核对下方会话列表后再决定是否重试。');
+        refreshRef.current();
+        return;
+      }
       if (!ack.ok) {
+        spawnedRef.current = false;
         throw new Error(ack.error ?? '启动请求被拒绝。');
       }
       const decoded = await decodeSpawnResult(ack.result ?? '', machineKey);
@@ -113,13 +129,18 @@ export function WorkbenchPage({ account }: { account: Account }) {
       if (interpretation.kind === 'success') {
         location.hash = `#session/${interpretation.sessionId}`;
       } else if (interpretation.kind === 'directory-approval') {
-        setDirectoryPending(interpretation.directory);
+        setDirectoryPending({ machineId: req.machineId, agent: req.agent, directory: req.directory, approvalPath: interpretation.directory });
       } else if (interpretation.kind === 'error') {
+        spawnedRef.current = false;
         setSpawnError(interpretation.message);
       } else {
-        setSpawnError('启动结果未知，已刷新会话列表。');
+        spawnedRef.current = false;
+        setSpawnError('启动结果未知，请核对下方会话列表后再决定是否重试。');
+        refreshRef.current();
       }
     } catch (error) {
+      // Explicit failure (connection down, rejection): release the lock so the user can retry.
+      spawnedRef.current = false;
       setSpawnError(errorText(error));
     } finally {
       setSpawnBusy(false);
@@ -135,17 +156,16 @@ export function WorkbenchPage({ account }: { account: Account }) {
       return;
     }
     spawnedRef.current = true;
-    void doSpawn(machineId, false);
+    void doSpawn({ machineId, agent, directory, approvedNewDirectoryCreation: false });
   }
 
   function confirmDirectoryCreation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (spawnBusy || directoryPending == null) return;
-    const dir = directoryPending;
+    if (spawnBusy || !directoryPending) return;
+    const req = directoryPending;
     setDirectoryPending(null);
     setSpawnResult(null);
-    setDirectory(dir);
-    void doSpawn(machineId, true);
+    void doSpawn({ machineId: req.machineId, agent: req.agent, directory: req.approvalPath, approvedNewDirectoryCreation: true });
   }
 
   function resetSpawn() {
@@ -190,6 +210,7 @@ export function WorkbenchPage({ account }: { account: Account }) {
           {records.devices.length ? records.devices.map(device => <div className="row" key={device.id}>
             <span>{device.title}</span>
             <span className={device.active ? 'status online' : 'status'}>{device.active ? '● 在线' : '离线'}</span>
+            {!device.decryptable && <span className="status">不可解密</span>}
             {confirmingRemoveId === device.id
               ? <span className="perm-actions">
                 <button type="button" className="primary" onClick={() => removeDevice(device.id)} disabled={removingId === device.id}>确认移除</button>
@@ -202,10 +223,10 @@ export function WorkbenchPage({ account }: { account: Account }) {
         <section className="panel"><h2>新建会话</h2>
           {spawnBusy && <p role="status">正在启动…</p>}
           {!spawnBusy && spawnResult?.kind === 'success' && <p role="status">已跳转到新会话。</p>}
-          {!spawnBusy && spawnResult?.kind === 'unknown' && <p role="status">启动结果未知，已刷新会话列表。</p>}
+          {!spawnBusy && spawnResult?.kind === 'unknown' && <p role="status">启动结果未知，请核对下方会话列表后再决定是否重试。</p>}
           {spawnError && !spawnBusy && <p role="alert" className="pending">{spawnError}</p>}
           {directoryPending && !spawnBusy ? <form className="composer" onSubmit={confirmDirectoryCreation}>
-            <p>在 <strong>{directoryPending}</strong> 创建目录并启动会话？</p>
+            <p>在 <strong>{directoryPending.approvalPath}</strong>（{directoryPending.agent}）创建目录并启动会话？</p>
             <button className="primary" type="submit">确认创建</button>
             <button type="button" onClick={resetSpawn}>取消</button>
           </form> : <form className="composer spawn-form" onSubmit={submitSpawn}>
@@ -216,8 +237,11 @@ export function WorkbenchPage({ account }: { account: Account }) {
             <select aria-label="Agent" value={agent} onChange={event => setAgent(event.target.value)}>
               <option value="claude">Claude Code</option>
               <option value="codex">Codex</option>
-              <option value="dsh">DSH（DeepSeek Harness）</option>
+              <option value="dsh" disabled={!deviceSupport[machineId]?.dsh}>DSH（DeepSeek Harness）</option>
             </select>
+            {machineId && !deviceSupport[machineId]?.dsh && agent === 'dsh' && (
+              <p className="hint">该设备未报告 DSH 支持，请在电脑上安装 <code>dsh</code> 后刷新。</p>
+            )}
             <input aria-label="项目路径" value={directory} onChange={event => setDirectory(event.target.value)} placeholder="/path/to/project" />
             <button className="primary" type="submit" disabled={spawnBusy || !machineId || !directory.trim() || (spawnResult?.kind === 'success')}>启动</button>
           </form>}
