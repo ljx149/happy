@@ -38,13 +38,13 @@ export async function handleAuthCommand(args: string[]): Promise<void> {
 
 function showAuthHelp(): void {
   console.log(`
-${chalk.bold('happy auth')} - Authentication management
+${chalk.bold('agentport auth')} - Authentication management
 
 ${chalk.bold('Usage:')}
-  happy auth login [--force]    Authenticate with Happy
-  happy auth logout             Remove authentication and machine data
-  happy auth status             Show authentication status
-  happy auth help               Show this help message
+  agentport auth login [--force]    Authenticate with AgentPort
+  agentport auth logout             Remove authentication and machine data
+  agentport auth status             Show authentication status
+  agentport auth help               Show this help message
 
 ${chalk.bold('Options:')}
   --force    Clear credentials, machine ID, and stop daemon before re-auth
@@ -96,7 +96,7 @@ async function handleAuthLogin(args: string[]): Promise<void> {
       console.log(chalk.green('✓ Already authenticated'));
       console.log(chalk.gray(`  Machine ID: ${settings.machineId}`));
       console.log(chalk.gray(`  Host: ${os.hostname()}`));
-      console.log(chalk.gray(`  Use 'happy auth login --force' to re-authenticate`));
+      console.log(chalk.gray(`  Use 'agentport auth login --force' to re-authenticate`));
       return;
     } else if (existingCreds && !settings?.machineId) {
       console.log(chalk.yellow('⚠️  Credentials exist but machine ID is missing'));
@@ -126,8 +126,8 @@ async function handleAuthLogout(): Promise<void> {
     return;
   }
 
-  console.log(chalk.blue('This will log you out of Happy'));
-  console.log(chalk.yellow('⚠️  You will need to re-authenticate to use Happy again'));
+  console.log(chalk.blue('This will log you out of AgentPort'));
+  console.log(chalk.yellow('⚠️  You will need to re-authenticate to use AgentPort again'));
 
   // Ask for confirmation
   const rl = createInterface({
@@ -155,7 +155,7 @@ async function handleAuthLogout(): Promise<void> {
       await clearMachineId();
 
       console.log(chalk.green('✓ Successfully logged out'));
-      console.log(chalk.gray('  Run "happy auth login" to authenticate again'));
+      console.log(chalk.gray('  Run "agentport auth login" to authenticate again'));
     } catch (error) {
       throw new Error(`Failed to logout: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -172,7 +172,7 @@ async function handleAuthStatus(): Promise<void> {
 
   if (!credentials) {
     console.log(chalk.red('✗ Not authenticated'));
-    console.log(chalk.gray('  Run "happy auth login" to authenticate'));
+    console.log(chalk.gray('  Run "agentport auth login" to authenticate'));
     return;
   }
 
@@ -189,7 +189,7 @@ async function handleAuthStatus(): Promise<void> {
     console.log(chalk.gray(`  Host: ${os.hostname()}`));
   } else {
     console.log(chalk.yellow('⚠️  Machine not registered'));
-    console.log(chalk.gray('  Run "happy auth login --force" to fix this'));
+    console.log(chalk.gray('  Run "agentport auth login --force" to fix this'));
   }
 
   // Data location

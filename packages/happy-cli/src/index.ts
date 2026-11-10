@@ -40,6 +40,12 @@ import { sanitizeSessionEnvironment } from './daemon/sessionEnvironment'
 (async () => {
   const args = process.argv.slice(2)
 
+  // Version checks must not authenticate or start an agent/daemon.
+  if (args.length === 1 && (args[0] === "--version" || args[0] === "-v")) {
+    console.log(`agentport version: ${packageJson.version}`)
+    return
+  }
+
   // If --version is passed - do not log, its likely daemon inquiring about our version
   if (!args.includes('--version')) {
     logger.debug('Starting happy CLI with args: ', process.argv)
@@ -709,46 +715,46 @@ ${chalk.bold('To clean up runaway processes:')} Use ${chalk.cyan('happy doctor c
     // Show help
     if (showHelp) {
       console.log(`
-${chalk.bold('happy')} - Claude Code On the Go
+${chalk.bold('agentport')} - Remote coding-agent CLI
 
 ${chalk.bold('Usage:')}
-  happy [options]         Start Claude with mobile control
-  happy auth              Manage authentication
-  happy resume            Resume a previous Happy session by Happy session ID
-  happy codex             Start Codex mode
-  happy gemini            Start Gemini mode (ACP) [deprecated — use agy]
-  happy agy               Start agy (Antigravity CLI) mode
-  happy acp               Start a generic ACP-compatible agent
-  happy connect           Connect AI vendor API keys
-  happy sandbox           Configure and manage OS-level sandboxing
-  happy notify            Send push notification
-  happy daemon            Manage background service that allows
+  agentport [options]         Start Claude with mobile control
+  agentport auth              Manage authentication
+  agentport resume            Resume a previous Happy session by Happy session ID
+  agentport codex             Start Codex mode
+  agentport gemini            Start Gemini mode (ACP) [deprecated — use agy]
+  agentport agy               Start agy (Antigravity CLI) mode
+  agentport acp               Start a generic ACP-compatible agent
+  agentport connect           Connect AI vendor API keys
+  agentport sandbox           Configure and manage OS-level sandboxing
+  agentport notify            Send push notification
+  agentport daemon            Manage background service that allows
                             to spawn new sessions away from your computer
-  happy doctor            System diagnostics & troubleshooting
+  agentport doctor            System diagnostics & troubleshooting
 
 ${chalk.bold('Examples:')}
-  happy                    Start session
-  happy resume cmmij8      Resume a previous session by Happy session ID
-  happy --yolo             Start with bypassing permissions
-                            happy sugar for --dangerously-skip-permissions
-  happy --chrome           Enable Chrome browser access for this session
-  happy --no-chrome        Disable Chrome even if default is on
-  happy --no-sandbox       Disable Happy sandbox for this session
-  happy --js-runtime bun   Use bun instead of node to spawn Claude Code
-  happy --claude-env ANTHROPIC_BASE_URL=http://127.0.0.1:3456
+  agentport                    Start session
+  agentport resume cmmij8      Resume a previous session by Happy session ID
+  agentport --yolo             Start with bypassing permissions
+                            agentport sugar for --dangerously-skip-permissions
+  agentport --chrome           Enable Chrome browser access for this session
+  agentport --no-chrome        Disable Chrome even if default is on
+  agentport --no-sandbox       Disable Happy sandbox for this session
+  agentport --js-runtime bun   Use bun instead of node to spawn Claude Code
+  agentport --claude-env ANTHROPIC_BASE_URL=http://127.0.0.1:3456
                            Use a custom API endpoint (e.g., claude-code-router)
-  happy acp gemini         Start Gemini via generic ACP runner
-  happy acp -- opencode --acp
+  agentport acp gemini         Start Gemini via generic ACP runner
+  agentport acp -- opencode --acp
                            Start a custom ACP command
-  happy acp opencode --verbose
+  agentport acp opencode --verbose
                            Print raw ACP backend/envelope events
-  happy auth login --force Authenticate
-  happy doctor             Run diagnostics
+  agentport auth login --force Authenticate
+  agentport doctor             Run diagnostics
 
 ${chalk.bold('Happy supports ALL Claude options!')}
-  Use any claude flag with happy as you would with claude. Our favorite:
+  Use any claude flag with agentport as you would with claude. Our favorite:
 
-  happy --resume
+  agentport --resume
 
 ${chalk.gray('─'.repeat(60))}
 ${chalk.bold.cyan('Claude Code Options (from `claude --help`):')}
@@ -768,7 +774,7 @@ ${chalk.bold.cyan('Claude Code Options (from `claude --help`):')}
 
     // Show version
     if (showVersion) {
-      console.log(`happy version: ${packageJson.version}`)
+      console.log(`agentport version: ${packageJson.version}`)
       // Don't exit - continue to pass --version to Claude Code
     }
 

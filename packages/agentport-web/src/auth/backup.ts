@@ -70,31 +70,15 @@ export function parse(formattedKey: string): string {
 }
 
 export function isValid(key: string): boolean {
-    try {
-        if (key.includes('-')) {
-            return decodeBase64(parse(key), 'base64url').length === 32;
-        }
-        return decodeBase64(key, 'base64url').length === 32;
-    } catch {
-        return false;
-    }
+    try { normalize(key); return true; } catch { return false; }
 }
 
-/**
- * Accepts either form and returns the base64url secret. Same decision order
- * as the native implementations: anything with a dash or whitespace, or
- * longer than 50 characters, is read as the formatted key.
- */
+/** Prefer the canonical 32-byte base64url form: a hyphen is a valid base64url character. */
 export function normalize(key: string): string {
     const trimmed = key.trim();
-    if (trimmed.split('').some(c => c === '-' || /\s/.test(c)) || trimmed.length > 50) {
-        return parse(trimmed);
-    }
-    try {
+    if (/^[A-Za-z0-9_-]{43}$/.test(trimmed)) {
         const bytes = decodeBase64(trimmed, 'base64url');
-        if (bytes.length !== 32) throw new Error('Invalid secret key');
-        return trimmed;
-    } catch {
-        return parse(trimmed);
+        if (bytes.length === 32 && encodeBase64(bytes, 'base64url') === trimmed) return trimmed;
     }
+    return parse(trimmed);
 }

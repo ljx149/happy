@@ -148,6 +148,9 @@ export const MachineMetadataSchema = z.object({
     // Optional so metadata written by a CLI predating agy detection still
     // matches this shape. detectCLIAvailability always reports it.
     agy: z.boolean().optional(),
+    // Optional so a CLI predating DSH detection still validates. A missing
+    // field is treated as "unsupported" by the web client.
+    dsh: z.boolean().optional(),
     detectedAt: z.number(),
   }).optional(),
   resumeSupport: z.object({

@@ -1,3 +1,5 @@
+import { mountWorkspace, unmountWorkspace } from './workspace';
+import { configureApi } from './lib/api';
 import { AuthStore, AuthState } from './auth/authStore';
 import { getTerminalAuthStatus, approveTerminalAuth, AuthError } from './auth/authClient';
 import { buildV2ApproverResponse, parsePairingLink } from './auth/pairing';
@@ -10,6 +12,7 @@ const cfg = {
     baseUrl: (window as unknown as { __HAPPY_CONFIG__?: { serverUrl?: string } }).__HAPPY_CONFIG__?.serverUrl ?? location.origin,
 };
 
+configureApi(cfg.baseUrl);
 const store = new AuthStore(cfg);
 let pendingPairKey = location.pathname === '/terminal/connect' ? parsePairingLink(location.hash) : null;
 try {
@@ -49,6 +52,7 @@ async function loadMachines(token: string): Promise<Array<{ id: string; hostname
 }
 
 async function render() {
+    unmountWorkspace();
     const s = store.getState();
     const requested = routeName();
 
@@ -91,6 +95,20 @@ async function render() {
         return;
     }
 
+    // Keep the existing account and pairing flow; mount live sessions separately.
+    if (requested === 'home' || requested.startsWith('session/')) {
+        layout.classList.remove('workspace');
+        sidebar.hidden = true;
+        screen.innerHTML = '<p role="status">正在加载工作台…</p>';
+        try {
+            await mountWorkspace(screen, s.token, s.secretBase64Url,
+                requested.startsWith('session/') ? requested.slice(8) : undefined,
+                () => store.getState() === s && routeName() === requested);
+        } catch {
+            if (store.getState() === s && routeName() === requested) screen.innerHTML = '<p role="alert">工作台加载失败，请刷新重试。</p>';
+        }
+        return;
+    }
     // signedIn
     layout.classList.add('workspace');
     sidebar.hidden = false;

@@ -41,4 +41,18 @@ describe('CLI availability detection', () => {
 
     expect(detectCLIAvailability().agy).toBe(true);
   });
+
+  it('reports dsh availability from command lookup', () => {
+    expect(detectCLIAvailability().dsh).toBe(false);
+
+    mockedExecSync.mockImplementation(() => {
+      if (typeof mockedExecSync.mock.calls[mockedExecSync.mock.calls.length - 1][0] === 'string'
+          && mockedExecSync.mock.calls[mockedExecSync.mock.calls.length - 1][0].includes('command -v dsh')) {
+        return undefined as unknown as string;
+      }
+      throw new Error('not installed');
+    });
+
+    expect(detectCLIAvailability().dsh).toBe(true);
+  });
 });
