@@ -59,7 +59,7 @@ export default {
     expo: {
         name,
         slug: "agentport-classic",
-        version: "1.8.0",
+        version: require('./package.json').version,
         runtimeVersion: "21",
         orientation: "default",
         icon: "./sources/assets/agentport/icon.png",

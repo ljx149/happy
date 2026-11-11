@@ -134,7 +134,7 @@ export const zhHant: TranslationStructure = {
         about: '關於',
         aboutFooter: 'AgentPort 是一個 Codex 和 Claude Code 行動用戶端。它採用端對端加密，您的帳戶僅儲存在本機裝置上。與 Anthropic 無關聯。',
         whatsNew: '更新日誌',
-        whatsNewSubtitle: '查看最新更新和改進',
+        whatsNewSubtitle: 'AgentPort 網頁與 CLI 發布記錄',
         reportIssue: '回報問題',
         privacyPolicy: '隱私權政策',
         termsOfService: '服務條款',

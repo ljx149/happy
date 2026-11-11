@@ -1,3 +1,5 @@
+> **AgentPort 分支**：本仓库当前用于 `https://agent.xcodex.vip`。开发现状、发布方式、历史记录和待办见 [AgentPort 开发记录](docs/agentport-development.md)。主 UI 在 `packages/happy-app`，备用 UI 在 `packages/agentport-web`。以下为保留的上游项目介绍，不表示所有上游功能都已在 AgentPort 上线。
+
 <div align="center">
 
 <h1>Happy Engineering</h1>

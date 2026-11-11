@@ -1,3 +1,13 @@
+> **AgentPort CLI 分支**：当前发布版本为 1.2.11，命令为 `agentport`。npm 官方同名 `agentport-cli` 属于其他项目，暂时使用本仓库 GitHub 安装包：
+>
+> ```sh
+> npm install -g https://github.com/ljx149/happy/releases/download/agentport-cli-1.2.11-test.1/agentport-cli-1.2.11.tgz
+> agentport auth login
+> agentport daemon start
+> ```
+>
+> 已配对的用户更新后无需重复登录；重启 daemon 并新建 DSH 会话才能使用新版本自动命名。开发进度、已知限制和待办见 [AgentPort 开发记录](../../docs/agentport-development.md)。下文保留上游 CLI 历史说明，命令、渠道及能力以当前 AgentPort 实现为准。
+
 # Happy
 
 Code on the go — control AI coding agents from your phone, browser, or terminal.

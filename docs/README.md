@@ -1,3 +1,7 @@
+# AgentPort 文档入口
+
+优先阅读 [开发记录、当前状态与待办](agentport-development.md)、[主 UI 说明](../packages/happy-app/UI-README.md)、[备用 UI 说明](../packages/agentport-web/UI-README.md)。AgentPort 已恢复 `happy-app` 作为主网页；下文关于旧 Expo 网页移除等描述属于上游历史，不代表当前分支。
+
 # Happy Docs
 
 This folder documents how Happy works internally, with a focus on protocol, backend architecture, deployment, and the CLI tool. Start here.

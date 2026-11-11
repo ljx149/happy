@@ -1,7 +1,7 @@
 {
   "name": "agentport-classic-ui",
   "main": "index.ts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -41,7 +41,8 @@
     "tauri:build:dev": "tauri build --config src-tauri/tauri.dev.conf.json",
     "tauri:build:preview": "tauri build --config src-tauri/tauri.preview.conf.json",
     "tauri:build:production": "tauri build",
-    "build:web": "cross-env APP_ENV=production EXPO_PUBLIC_DISABLE_ANALYTICS=1 expo export --platform web"
+    "changelog:generate": "tsx sources/scripts/parseChangelog.ts",
+    "build:web": "pnpm changelog:generate && cross-env APP_ENV=production EXPO_PUBLIC_DISABLE_ANALYTICS=1 expo export --platform web --clear"
   },
   "jest": {
     "preset": "jest-expo"

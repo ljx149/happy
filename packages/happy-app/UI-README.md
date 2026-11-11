@@ -59,3 +59,13 @@ corepack pnpm --filter agentport-classic-ui build:web
 电脑端必须升级至 1.2.10 并重启 daemon。旧版本、离线、目录不存在、初始化失败和超时会明确提示，可手动重新读取。切换电脑/目录/harness 会丢弃旧结果；没有有效列表时保留“沿用电脑配置”。模型目录不代表已验证每个模型的调用权限；Claude 当前默认模型没有可靠字段时不推测，默认选项仍由本机决定。DSH 不报告推理强度时不显示强度按钮。
 
 精简版保持原来的先启动会话、再读取会话 metadata 的流程，本次不替换其线上静态文件。测试区分真实 Codex/Claude 查询、DSH ACP 协议夹具与用户电脑验收，不能混称全部真实运行通过。
+
+## 设置页与发布记录（网页 1.0.1）
+
+设置页及桌面设置面板共用 `SettingsView`，仅保留账户、Agent、更新日志和版本。赞助、第三方账号连接、外观、语音、用量、开发工具、隐私条款等主页入口暂时隐藏；不删除路由、已有设置或账户数据。官网反馈地址尚未确认，“报告问题”暂时隐藏。
+
+网页版本以本目录 `package.json` 为唯一来源，`app.config.js` 注入版本和构建所用 Git SHA 及提交时间，设置页不再显示上游 runtime 版本或连点开发开关。网页版本与 CLI 1.2.11 独立。
+
+用户更新日志源是 `AGENTPORT-CHANGELOG.md`，通过 `pnpm changelog:generate` 生成 `sources/changelog/agentport-changelog.json`；`build:web` 自动生成，并以 `expo export --clear` 清理 Metro 缓存，确保内嵌版本与构建提交正确。原上游 `CHANGELOG.md` / `changelog.json` 留作历史，不再作为产品日志源。
+
+DSH CLI 1.2.11 已补齐首条消息标题兜底、ACP 标题和 MCP 命名同步，网页沿用 metadata.summary 显示，不需要为此升级 UI。真实用户 DSH 环境仍需验收。完整开发历程及未完成事项见 [开发记录](../../docs/agentport-development.md)。

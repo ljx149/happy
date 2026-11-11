@@ -16,10 +16,10 @@ interface ChangelogData {
 }
 
 function parseChangelog(): ChangelogData {
-    const changelogPath = path.join(__dirname, '../../CHANGELOG.md');
+    const changelogPath = path.join(__dirname, '../../AGENTPORT-CHANGELOG.md');
 
     if (!fs.existsSync(changelogPath)) {
-        console.warn('CHANGELOG.md not found');
+        console.warn('AGENTPORT-CHANGELOG.md not found');
         return { entries: [], latestTitle: '' };
     }
 
@@ -73,10 +73,10 @@ function parseChangelog(): ChangelogData {
 }
 
 function main() {
-    console.log('Parsing CHANGELOG.md...');
+    console.log('Parsing AGENTPORT-CHANGELOG.md...');
 
     const changelogData = parseChangelog();
-    const outputPath = path.join(__dirname, '../changelog/changelog.json');
+    const outputPath = path.join(__dirname, '../changelog/agentport-changelog.json');
 
     const dir = path.dirname(outputPath);
     if (!fs.existsSync(dir)) {
