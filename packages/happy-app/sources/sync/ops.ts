@@ -360,6 +360,10 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
  * the payload otherwise, so the one field the flow reads is settled here.
  */
 export function normalizeSpawnSessionResult(result: unknown): SpawnSessionResult {
+    // CLI RPC failures are encrypted as { error }; retain the actionable refusal.
+    if (result && typeof result === 'object' && 'error' in result && typeof result.error === 'string') {
+        return { type: 'error', errorMessage: result.error };
+    }
     if (typeof result !== 'object' || result === null || typeof (result as { type?: unknown }).type !== 'string') {
         return { type: 'error', errorMessage: 'The machine answered with something Happy could not read.' };
     }

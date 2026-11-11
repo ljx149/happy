@@ -21,3 +21,9 @@ it('does not impose the DSH version requirement on Codex', async () => {
   await machineSpawnNewSession({ machineId: 'm', directory: '/tmp', agent: 'codex' });
   expect(rpc).toHaveBeenCalled();
 });
+
+it('preserves the encrypted daemon configuration refusal', async () => {
+  state.machines.m = { metadata: { happyCliVersion: '1.2.12' } };
+  rpc.mockResolvedValue({ error: 'Configure xmodels/Xcoder1.0 first' });
+  expect(await machineSpawnNewSession({ machineId: 'm', directory: '/tmp', agent: 'dsh' })).toEqual({ type: 'error', errorMessage: 'Configure xmodels/Xcoder1.0 first' });
+});
