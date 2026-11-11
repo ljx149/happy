@@ -4,7 +4,7 @@
 
 两套 UI 并存：
 
-- `packages/agentport-web`：当前线上网页，保持原样。
+- `packages/agentport-web`：自建精简网页，作为备用和回滚入口保留。
 - `packages/happy-app`：恢复的官方布局和交互，工作区包名 `agentport-classic-ui`。
 
 ## 本次调整
@@ -37,4 +37,4 @@ Web 导出产物为 `packages/happy-app/dist`。开发预览不是生产发布�
 
 本次尚未验收完整登录/恢复/配对、生产账户迁移、Codex/Claude Code/DSH 会话创建与审批。原版内的桌面应用、语音、订阅、云服务及其他 Agent 入口不代表 AgentPort 已实现这些能力。上线前需要逐项确认或适配。
 
-当前线上入口没有切换，Nginx、DNS、证书和 AgentPort 服务未改动。不要运行历史原生移动端或 Expo 发布脚本；本恢复版仅验证 Web 构建。
+以上为首次恢复时的验收记录。后续两套 UI 的分工、试运行入口和迁移说明见 `UI-README.md`；实际上线状态以发布记录为准。不要运行历史原生移动端或 Expo 发布脚本；本恢复版仅验证 Web 构建。

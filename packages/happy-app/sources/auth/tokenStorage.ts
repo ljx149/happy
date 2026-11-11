@@ -14,7 +14,18 @@ export interface AuthCredentials {
 export const TokenStorage = {
     async getCredentials(): Promise<AuthCredentials | null> {
         if (Platform.OS === 'web') {
-            return localStorage.getItem(AUTH_KEY) ? JSON.parse(localStorage.getItem(AUTH_KEY)!) as AuthCredentials : null;
+            const stored = localStorage.getItem(AUTH_KEY);
+            if (stored) return JSON.parse(stored) as AuthCredentials;
+            const { importLegacyUiCredentials, markLegacyIdentityHandled } = await import('./legacyUiCredentials');
+            const { authGetToken } = await import('./authGetToken');
+            const { getServerUrl } = await import('@/sync/serverConfig');
+            const server = getServerUrl();
+            const migrated = await importLegacyUiCredentials(server, secret => authGetToken(secret, server));
+            if (migrated) {
+                localStorage.setItem(AUTH_KEY, JSON.stringify(migrated));
+                markLegacyIdentityHandled();
+            }
+            return migrated;
         }
         try {
             const stored = await SecureStore.getItemAsync(AUTH_KEY);
@@ -45,6 +56,8 @@ export const TokenStorage = {
 
     async removeCredentials(): Promise<boolean> {
         if (Platform.OS === 'web') {    
+            const { markLegacyIdentityHandled } = await import('./legacyUiCredentials');
+            markLegacyIdentityHandled();
             localStorage.removeItem(AUTH_KEY);
             return true;
         }
