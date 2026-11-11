@@ -2440,16 +2440,20 @@ function NewSessionScreen() {
                             <ScrollView
                                 style={styles.mobileConfigScroll}
                                 contentContainerStyle={[styles.mobileConfigScrollContent, isCompactWeb && { justifyContent: 'flex-start' }]}
-                                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                                keyboardDismissMode={isCompactWeb ? 'none' : Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                                 keyboardShouldPersistTaps="handled"
                                 onScrollBeginDrag={() => {
-                                    Keyboard.dismiss();
-                                    if (!isCompactWeb) closePicker();
+                                    if (!isCompactWeb) {
+                                        Keyboard.dismiss();
+                                        closePicker();
+                                    }
                                 }}
                                 showsVerticalScrollIndicator={false}
                             >
                                 <Pressable
-                                    onPress={() => {
+                                    // On mobile web the picker is inside this area.
+                                    // Its text inputs must not trigger outside-click dismissal.
+                                    onPress={isCompactWeb ? undefined : () => {
                                         Keyboard.dismiss();
                                         closePicker();
                                     }}
