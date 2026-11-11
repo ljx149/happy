@@ -68,7 +68,7 @@ import {
     type ModelMode,
     type EffortLevel,
 } from '@/components/modelModeOptions';
-import { findNewSessionModelCatalog } from '@/sync/newSessionModelCatalog';
+import { useMachineModelCatalog } from '@/hooks/useMachineModelCatalog';
 import { isRunningOnMac } from '@/utils/platform';
 import { getNewSessionSidebarLayout } from '@/utils/newSessionSidebarLayout';
 import { getAgentPickerItems, getModePickerItems } from '@/utils/newSessionPickerItems';
@@ -1116,11 +1116,14 @@ function NewSessionScreen() {
             effortLevel: rigCreation.defaultEffortForModel(rigCreation.defaultModelKey),
         }
         : resolveAgentDefaultConfig(agentDefaultOverrides, selectedAgent, happyCliVersion), [agentDefaultOverrides, happyCliVersion, selectedAgent, rigCreation]);
-    const reportedModelCatalog = React.useMemo(() => findNewSessionModelCatalog(
-        sessionList, placeMachineIds, selectedAgent, selectedPath, selectedHomeDir,
-    ), [sessionList, placeMachineIds, selectedAgent, selectedPath, selectedHomeDir]);
+    const liveModelCatalog = useMachineModelCatalog(
+        selectedChoice?.happyMachine?.id, resolvedSelectedPath, selectedAgent,
+        happyCliVersion ?? undefined, !!selectedChoice?.happyMachine && isMachineOnline(selectedChoice.happyMachine),
+    );
+    const reportedModelCatalog = liveModelCatalog.metadata;
     const modelModes = React.useMemo<ModelMode[]>(() => {
         if (rigCreation) return rigCreation.models;
+        if (!reportedModelCatalog && ['claude', 'codex', 'dsh'].includes(selectedAgent)) return [{ key: 'default', name: 'Use computer configuration' }];
         const reported = getAvailableModels(selectedAgent, reportedModelCatalog, t, effectiveAgentDefaults.modelMode);
         return reported.some(model => model.key === 'default') ? reported
             : [{ key: 'default', name: 'Use computer configuration' }, ...reported];
@@ -1131,7 +1134,7 @@ function NewSessionScreen() {
 
     const effortLevels = React.useMemo<EffortLevel[]>(() => {
         if (rigCreation) return rigCreation.effortsForModel(currentModelKey).map(key => ({ key, name: key }));
-        const levels = getEffortLevelsForModel(selectedAgent, currentModelKey, reportedModelCatalog);
+        const levels = reportedModelCatalog ? getEffortLevelsForModel(selectedAgent, currentModelKey, reportedModelCatalog) : [];
         return levels.length ? [{ key: 'default', name: 'Use computer configuration' }, ...levels] : [];
     }, [selectedAgent, currentModelKey, rigCreation, reportedModelCatalog]);
     const effectiveEffortDefault = rigCreation?.defaultEffortForModel(currentModelKey)
@@ -2069,11 +2072,15 @@ function NewSessionScreen() {
                                         </BubblePressable>
                                     )}
                                     {!rigCreation && (
-                                        <Text style={[styles.configLabel, { color: theme.colors.textSecondary, fontSize: 12, paddingHorizontal: 12 }]}>
-                                            {reportedModelCatalog
-                                                ? '此电脑在该目录最近上报的模型；启动后以运行器实际能力为准。'
-                                                : '尚未读取到该目录的模型列表。可沿用电脑配置启动，再在对话中选择模型。'}
-                                        </Text>
+                                        <View style={{ paddingHorizontal: 12, gap: 6 }}>
+                                            <Text accessibilityRole={liveModelCatalog.error ? 'alert' : undefined} style={[styles.configLabel, { color: theme.colors.textSecondary, fontSize: 12 }]}>
+                                                {liveModelCatalog.loading ? '正在从电脑读取模型配置…' : liveModelCatalog.error
+                                                    ?? (reportedModelCatalog ? '已从所选电脑实时读取模型配置。' : '请选择电脑和工作目录。')}
+                                            </Text>
+                                            <BubblePressable accessibilityRole="button" accessibilityLabel="Refresh models" disabled={liveModelCatalog.loading} onPress={liveModelCatalog.retry}>
+                                                <Text style={{ color: theme.colors.textLink }}>重新读取模型</Text>
+                                            </BubblePressable>
+                                        </View>
                                     )}
                                     {renderActivePickerPopover('agent')}
                                     {renderActivePickerPopover('model')}

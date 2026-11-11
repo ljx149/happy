@@ -614,7 +614,7 @@ export function getEffortLevelsForModel(
             name: effortDisplayName(level),
         }));
     }
-    if (flavor === 'codex') {
+    if (flavor === 'codex' || (flavor === 'claude' && metadata?.modelCatalogSource === 'claude-sdk')) {
         const key = modelKey === 'default' ? metadata?.currentModelCode : modelKey;
         return mapMetadataOptions(key ? metadata?.modelReasoningEfforts?.[key] : undefined);
     }

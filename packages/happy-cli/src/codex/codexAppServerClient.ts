@@ -258,7 +258,7 @@ export class CodexAppServerClient {
     private eventHandler: ((msg: EventMsg) => void) | null = null;
     private approvalHandler: ApprovalHandler | null = null;
 
-    constructor(sandboxConfig?: SandboxConfig) {
+    constructor(sandboxConfig?: SandboxConfig, private readonly workingDirectory?: string) {
         this.sandboxConfig = sandboxConfig;
     }
 
@@ -646,6 +646,7 @@ export class CodexAppServerClient {
         // Use cross-spawn so npm-installed wrappers (codex.cmd / codex.ps1) resolve on Windows.
         // Native child_process.spawn fails with ENOENT for .cmd shims (issues #980, #1016).
         const proc = crossSpawn(command, args, {
+            cwd: this.workingDirectory,
             stdio: ['pipe', 'pipe', 'pipe'],
             env,
             windowsHide: true,
@@ -787,11 +788,11 @@ export class CodexAppServerClient {
 
     // ─── Thread management ──────────────────────────────────────
 
-    async getModelMetadata(cwd = process.cwd()) {
+    async getModelMetadata(cwd = process.cwd(), strict = false) {
         // Older app-servers may lack either method. Keep native startup usable.
         const [config, models] = await Promise.all([
-            this.request('config/read', { includeLayers: false, cwd }, 10000).catch(() => null),
-            this.request('model/list', { limit: 100, includeHidden: false }, 10000).catch(() => null),
+            this.request('config/read', { includeLayers: false, cwd }, 10000).catch(error => { if (strict) throw error; return null; }),
+            this.request('model/list', { limit: 100, includeHidden: false }, 10000).catch(error => { if (strict) throw error; return null; }),
         ]);
         return codexModelMetadata(config, models);
     }

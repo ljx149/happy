@@ -30,6 +30,7 @@ export function query(params: { prompt: QueryPrompt; options?: QueryOptions }): 
     // Map QueryOptions -> official Options
     const sdkOptions: Options = {
         cwd: opts?.cwd,
+        settingSources: ['user', 'project', 'local'],
         resume: opts?.resume,
         continue: opts?.continue,
         model: opts?.model,

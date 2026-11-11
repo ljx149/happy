@@ -479,3 +479,17 @@ describe('modelModeOptions', () => {
             .toBe('Supercalifragili\u2026');
     });
 });
+
+describe('live Claude capability reporting', () => {
+    it('uses only the chosen model advertised efforts', () => {
+        expect(getEffortLevelsForModel('claude', 'private', {
+            path: '/tmp', host: 'test', modelCatalogSource: 'claude-sdk',
+            modelReasoningEfforts: { private: [{ code: 'low', value: 'low' }] },
+        }).map(x => x.key)).toEqual(['low']);
+    });
+    it('does not invent efforts when the live runtime has no capability', () => {
+        expect(getEffortLevelsForModel('claude', 'private', {
+            path: '/tmp', host: 'test', modelCatalogSource: 'claude-sdk', modelReasoningEfforts: {},
+        })).toEqual([]);
+    });
+});

@@ -27,6 +27,7 @@ import {
     ForkTruncateUuidNotFoundError,
     ForkSourceMissingError,
 } from '@/claude/utils/claudeSessionFork';
+import { queryMachineModelCatalog } from '@/daemon/modelCatalog';
 import { CodexAppServerClient } from '@/codex/codexAppServerClient';
 import {
     CodexForkRewindPointNotFoundError,
@@ -180,6 +181,8 @@ export class ApiMachineClient {
         requestShutdown
     }: MachineRpcHandlers) {
         this.resumeSessionHandler = resumeSession ?? null;
+
+        this.rpcHandlerManager.registerHandler('read-model-catalog', queryMachineModelCatalog);
 
         // Register spawn session handler
         this.rpcHandlerManager.registerHandler('spawn-happy-session', async (params: any) => {
