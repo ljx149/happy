@@ -5,3 +5,4 @@ packages:
   - "packages/happy-wire"
   - "packages/happy-push-server"
   - "packages/agentport-web"
+  - "packages/happy-app"
