@@ -94,3 +94,19 @@ html.happy-app-zoomed body {
         background-position: 0% 0;
     }
 }
+
+/* Mobile browser bars and keyboards can shrink only the visual viewport. */
+@media (max-width: 700px) {
+    html, html body, html.happy-app-zoomed body, html #root {
+        height: var(--agentport-viewport-height, 100dvh);
+        min-height: 0;
+        overflow: hidden;
+    }
+}
+[data-testid="picker-sheet-list"] {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}

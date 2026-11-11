@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Modal as RNModal, Pressable, ScrollView, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
+import { Modal as RNModal, Platform, Pressable, ScrollView, Text, View, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,6 +77,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     list: {
         flexGrow: 0,
         flexShrink: 1,
+        minHeight: 0,
     },
     listContent: {
         paddingBottom: 8,
@@ -170,6 +171,7 @@ export function PickerSheetPanel(props: {
 }) {
     const styles = stylesheet;
     const { theme } = useUnistyles();
+    const { height } = useWindowDimensions();
     return (
         <Animated.View
             style={[styles.panel, props.attached && styles.panelAttached, props.style as StyleProp<ViewStyle>]}
@@ -190,7 +192,9 @@ export function PickerSheetPanel(props: {
                 </Pressable>
             </View>
             <ScrollView
-                style={styles.list}
+                style={[styles.list, Platform.OS === 'web' && { maxHeight: Math.max(96, height * MAX_HEIGHT_FRACTION - 96) }]}
+                testID="picker-sheet-list"
+                nestedScrollEnabled
                 contentContainerStyle={styles.listContent}
                 keyboardShouldPersistTaps="handled"
             >

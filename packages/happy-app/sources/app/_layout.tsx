@@ -1,5 +1,6 @@
 import 'react-native-quick-base64';
 import '../theme.css';
+import { useMobileWebViewport } from '@/hooks/useMobileWebViewport';
 import * as React from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Fonts from 'expo-font';
@@ -248,6 +249,7 @@ function getDevWebQueryCredentials(): AuthCredentials | null {
 }
 
 export default function RootLayout() {
+    useMobileWebViewport();
     useTauriZoom();
     useTauriDrag();
     const router = useRouter();

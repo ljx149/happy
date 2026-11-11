@@ -1584,7 +1584,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                         )}
 
                         {props.onAbort && (
-                            <Shaker ref={shakerRef}>
+                            <Shaker ref={shakerRef} style={{ flexShrink: 0 }}>
                                 <Pressable
                                     style={(p) => ({
                                         flexDirection: 'row',
@@ -2174,7 +2174,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             <FileViewerButton sessionId={props.sessionId} onPress={props.onFileViewerPress} />
                         )}
 
-                        <Shaker ref={shakerRef}>
+                        <Shaker ref={shakerRef} style={{ flexShrink: 0 }}>
                             <View
                                 style={[
                                     styles.sendButton,

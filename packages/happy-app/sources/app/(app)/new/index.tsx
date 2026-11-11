@@ -393,6 +393,8 @@ function PickerContent({
             )}
 
             <ScrollView
+                testID="picker-sheet-list"
+                nestedScrollEnabled
                 style={[pickerStyles.optionList, embedded && pickerStyles.embeddedOptionList]}
                 contentContainerStyle={embedded && pickerStyles.embeddedOptionListContent}
                 keyboardShouldPersistTaps="handled"
@@ -690,6 +692,8 @@ function PathPickerContent({
             </Text>
 
             <ScrollView
+                testID="picker-sheet-list"
+                nestedScrollEnabled
                 style={[pickerStyles.optionList, embedded && pickerStyles.embeddedOptionList]}
                 contentContainerStyle={embedded && pickerStyles.embeddedOptionListContent}
                 keyboardShouldPersistTaps="handled"
@@ -1189,6 +1193,7 @@ function NewSessionScreen() {
     // The reference keeps the context controls visible while the keyboard is
     // open. Preserve that on mobile and let users collapse them explicitly.
     const isDesktop = Platform.OS === 'web' || isRunningOnMac();
+    const isCompactWeb = Platform.OS === 'web' && windowWidth <= 700;
 
 
     const cancelPendingPickerOpen = React.useCallback(() => {
@@ -2286,7 +2291,7 @@ function NewSessionScreen() {
             <View style={[styles.inputField, isNativeMobile && styles.mobileInputField]}>
                 <PromptInput
                     ref={composerInputRef}
-                    compact={isNativeMobile}
+                    compact={isNativeMobile || isCompactWeb}
                     placeholder={isNativeMobile ? composerPlaceholder : 'What would you like to work on?'}
                     onKeyPress={handleKeyPress}
                 />
@@ -2430,16 +2435,16 @@ function NewSessionScreen() {
                             style={styles.nativePickerBackdrop}
                         />
                     )}
-                    {isNativeMobile ? (
+                    {(isNativeMobile || isCompactWeb) ? (
                         <>
                             <ScrollView
                                 style={styles.mobileConfigScroll}
-                                contentContainerStyle={styles.mobileConfigScrollContent}
+                                contentContainerStyle={[styles.mobileConfigScrollContent, isCompactWeb && { justifyContent: 'flex-start' }]}
                                 keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                                 keyboardShouldPersistTaps="handled"
                                 onScrollBeginDrag={() => {
                                     Keyboard.dismiss();
-                                    closePicker();
+                                    if (!isCompactWeb) closePicker();
                                 }}
                                 showsVerticalScrollIndicator={false}
                             >
@@ -2448,7 +2453,7 @@ function NewSessionScreen() {
                                         Keyboard.dismiss();
                                         closePicker();
                                     }}
-                                    style={styles.mobileKeyboardDismissArea}
+                                    style={[styles.mobileKeyboardDismissArea, isCompactWeb && { paddingTop: 0, justifyContent: 'flex-start' }]}
                                 >
                                     <View
                                         onLayout={(event) => {
@@ -3246,6 +3251,8 @@ const pickerStyles = {
         marginVertical: 4,
     } as const,
     optionList: {
+        maxHeight: 280,
+        minHeight: 0,
         flexGrow: 0,
         flexShrink: 1,
     } as const,
