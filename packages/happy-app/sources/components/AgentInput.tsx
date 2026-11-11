@@ -831,9 +831,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     const styles = stylesheet;
     const { theme } = useUnistyles();
     const { width: screenWidth } = useLayoutDimensions();
-    // The compact action row is deliberately limited to the narrow native
-    // layout. Desktop web, Mac Catalyst, and tablet-width canvases retain the
-    // existing composer affordances rather than inheriting it.
+    // Narrow web and native layouts share the compact composer action row.
+    // Wider layouts keep direct model controls above their existing actions.
     const runningOnMac = isRunningOnMac();
     const compactMobileComposer = !runningOnMac && screenWidth <= 700;
     // iOS only. On Android the settings/model/effort triggers are React Native
@@ -1499,6 +1498,18 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     const desktopActionControls = (
         <View style={styles.actionButtonsContainer}>
             <View style={{ flexDirection: 'column', flex: 1, gap: 2 }}>
+                {!useNativeSettingsMenus && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                        <BubblePressable onPress={handleModelPress} disabled={!canOpenModelPicker} accessibilityRole="button" accessibilityLabel={t('agentInput.model.title')} style={styles.mobileModeButton}>
+                            {renderModelValue()}
+                        </BubblePressable>
+                        {effortSettingsGroup && (
+                            <BubblePressable onPress={handleEffortPress} disabled={!canOpenEffortPicker} accessibilityRole="button" accessibilityLabel={t('agentInput.effort.title')} style={styles.mobileEffortButton}>
+                                {renderEffortValue()}
+                            </BubblePressable>
+                        )}
+                    </View>
+                )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     {props.zenMode && <View style={{ flex: 1 }} />}
                     {!props.zenMode && <View style={styles.actionButtonsLeft}>
@@ -1872,7 +1883,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                 {/* A full-window sheet rather than an overlay inside the
                     composer: Android clips an overlay to the composer's bounds,
                     which left its list unscrollable and taps outside it dead. */}
-                {compactMobileComposer && !useNativeSettingsMenus && openPicker && (
+                {!useNativeSettingsMenus && openPicker && (compactMobileComposer || openPicker !== 'permission') && (
                     <PickerSheet
                         visible
                         title={openPicker === 'permission'
@@ -2070,7 +2081,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             )
                         )}
 
-                        {!props.zenMode ? (
+                        {/* Model and effort remain essential in focus mode. */}
                             <>
                                 {/* Pushes model/effort right, so the effort chip
                                     sits against the send button and the pair does
@@ -2142,7 +2153,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     )
                                 )}
                             </>
-                        ) : <View style={{ flex: 1 }} />}
                         </View>
 
                         {!compactMobileComposer && props.agentType && props.onAgentClick && (
