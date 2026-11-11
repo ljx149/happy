@@ -6,7 +6,7 @@ import { isHarnessAvailable, listAvailableHarnesses } from '@/utils/harnessCatal
 
 describe('AgentPort classic compatibility', () => {
     const model = '["private-provider","my-model"]';
-    const metadata = MetadataSchema.parse({ path: '/work', host: 'computer', flavor: 'acp', agentName: 'dsh',
+    const metadata = MetadataSchema.parse({ path: '/work', host: 'computer', flavor: 'acp', agentName: 'dsh', version: '1.2.9',
         modelCatalogSource: 'dsh-acp-profile', currentModelCode: model,
         models: [{ code: model, value: 'Private provider / My model' }],
         thoughtLevels: [{ code: 'enabled', value: 'Thinking' }], currentThoughtLevelCode: 'enabled',
@@ -27,6 +27,12 @@ describe('AgentPort classic compatibility', () => {
         expect(resolveMessageModeMeta({ metadata, modelMode: model, effortLevel: 'enabled' } as any))
             .toEqual({ model, effort: 'enabled' });
     });
+    it('matches the compact UI by hiding unsupported or stale ACP effort', () => {
+        expect(getEffortLevelsForModel('dsh', model, { ...metadata, thoughtLevels: undefined })).toEqual([]);
+        expect(getEffortLevelsForModel('dsh', 'another-model', metadata)).toEqual([]);
+        expect(getEffortLevelsForModel('dsh', model, { ...metadata, version: '1.2.7' })).toEqual([]);
+    });
+
     it('does not apply Claude defaults to a DSH session or invent unsupported effort', () => {
         expect(resolveMessageModeMeta({ metadata } as any, { agentDefaultOverrides: { claude: { modelMode: 'wrong' } } }))
             .toEqual({});

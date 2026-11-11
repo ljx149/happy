@@ -117,6 +117,7 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId }: 
                     <Text style={styles.title} numberOfLines={1}>
                         {project.name}
                     </Text>
+                    <Text style={styles.branchText} numberOfLines={2}>{firstSession?.machineName} · {firstSession?.path}</Text>
                     <View style={styles.branchLine}>
                         <Text style={styles.branchText} numberOfLines={1}>
                             {branchName}

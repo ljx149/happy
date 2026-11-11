@@ -99,6 +99,7 @@ export function getSessionName(session: Session): string {
     if (session.metadata?.summary) {
         return session.metadata.summary.text;
     }
+    if (session.metadata?.name?.trim()) return session.metadata.name.trim();
     return t('session.newChat');
 }
 

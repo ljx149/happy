@@ -709,7 +709,7 @@ const SessionItem = React.memo(({ session, selected, isFirst, isLast, isSingle }
                         styles.sessionTitle,
                         status.isConnected ? styles.sessionTitleConnected : styles.sessionTitleDisconnected
                     ]} numberOfLines={1}>
-                        {session.name}
+                        {session.name}{session.flavor ? ` · ${getHarnessName(session.flavor)}` : ''}
                     </Text>
                     <SessionShortcutHintBadge
                         sessionId={session.id}

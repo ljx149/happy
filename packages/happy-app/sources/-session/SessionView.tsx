@@ -435,6 +435,7 @@ export const SessionView = React.memo((props: { id: string }) => {
                     size={28}
                     monochrome={!headerProps.isConnected}
                     flavor={session.metadata?.flavor}
+                    agentName={session.metadata?.agentName}
                     clientId={session.metadata?.client?.id}
                     badgeLocation="sessionHeader"
                     imageUrl={avatar?.uri}

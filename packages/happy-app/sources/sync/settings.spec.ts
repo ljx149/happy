@@ -3,6 +3,13 @@ import { SettingsSchema, settingsParse, applySettings, settingsDefaults, setting
 
 describe('settings', () => {
     describe('settingsParse', () => {
+        it('enables the restored features once and preserves later choices', () => {
+            const migrated = settingsParse({ showFlavorIcons: false, sessionListGrouping: 'flat' });
+            expect(migrated.showFlavorIcons).toBe(true);
+            expect(migrated.sessionListGrouping).toBe('project');
+            const chosen = applySettings(migrated, { showFlavorIcons: false, sessionListGrouping: 'flat' });
+            expect(settingsParse(settingsToSyncPayload(chosen))).toMatchObject({ showFlavorIcons: false, sessionListGrouping: 'flat', agentportUiDefaultsVersion: 1 });
+        });
         it('should return defaults when given invalid input', () => {
             expect(settingsParse(null)).toEqual(settingsDefaults);
             expect(settingsParse(undefined)).toEqual(settingsDefaults);
@@ -179,6 +186,7 @@ describe('settings', () => {
 
         it('should have correct default values', () => {
             expect(settingsDefaults).toEqual({
+                agentportUiDefaultsVersion: 1,
                 schemaVersion: 2,
                 viewInline: false,
                 expandTodos: true,
@@ -193,8 +201,8 @@ describe('settings', () => {
                 agentInputEnterToSend: true,
                 avatarStyle: 'brutalist',
                 avatarMonochrome: false,
-                sessionListGrouping: 'flat',
-                showFlavorIcons: false,
+                sessionListGrouping: 'project',
+                showFlavorIcons: true,
                 showHarnessIconInSessionHeader: true,
                 userMessageBubbleColor: 'gray',
                 usageLimitShowRemaining: false,

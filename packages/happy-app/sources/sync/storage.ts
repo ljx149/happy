@@ -224,7 +224,7 @@ function buildSessionRowData(
         name: getSessionName(session),
         subtitle: getSessionSubtitle(session),
         avatarId: getSessionAvatarId(session),
-        flavor: session.metadata?.flavor ?? null,
+        flavor: session.metadata?.agentName === 'dsh' ? 'dsh' : session.metadata?.flavor ?? null,
         clientId: session.metadata?.client?.id ?? null,
         identityLine: rigIdentity ? `${rigIdentity.clientName} · ${rigIdentity.providerName}` : null,
         providerKind: rigIdentity?.providerKind ?? session.metadata?.provider?.kind ?? null,

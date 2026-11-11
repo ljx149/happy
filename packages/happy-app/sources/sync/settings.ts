@@ -16,6 +16,7 @@ export const SESSION_LIST_GROUPING_MODES = ['flat', 'project'] as const;
 export type SessionListGrouping = typeof SESSION_LIST_GROUPING_MODES[number];
 
 export const SettingsSchema = z.object({
+    agentportUiDefaultsVersion: z.number().int().nonnegative(),
     // Schema version for compatibility detection
     schemaVersion: z.number().default(SUPPORTED_SCHEMA_VERSION).describe('Settings schema version for compatibility checks'),
 
@@ -105,6 +106,7 @@ export type Settings = z.infer<typeof SettingsSchema>;
 //
 
 export const settingsDefaults: Settings = {
+    agentportUiDefaultsVersion: 1,
     schemaVersion: SUPPORTED_SCHEMA_VERSION,
     viewInline: false,
     inferenceOpenAIKey: null,
@@ -119,8 +121,8 @@ export const settingsDefaults: Settings = {
     agentInputEnterToSend: true,
     avatarStyle: 'brutalist',
     avatarMonochrome: false,
-    sessionListGrouping: 'flat',
-    showFlavorIcons: false,
+    sessionListGrouping: 'project',
+    showFlavorIcons: true,
     showHarnessIconInSessionHeader: true,
     userMessageBubbleColor: DEFAULT_USER_MESSAGE_BUBBLE_COLOR,
     usageLimitShowRemaining: false,
@@ -165,6 +167,13 @@ export function settingsParse(settings: unknown): Settings {
         const knownFields = Object.keys(SettingsSchema.shape);
         knownFields.forEach(key => delete unknownFields[key]);
         return { ...settingsDefaults, ...unknownFields };
+    }
+
+    // Restore AgentPort's visible harnesses and full directory grouping once.
+    if ((parsed.data.agentportUiDefaultsVersion ?? 0) < 1) {
+        parsed.data.agentportUiDefaultsVersion = 1;
+        parsed.data.showFlavorIcons = true;
+        parsed.data.sessionListGrouping = 'project';
     }
 
     // Migration: Convert old 'zh' language code to 'zh-Hans'

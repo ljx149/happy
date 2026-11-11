@@ -13,6 +13,12 @@ describe('resolveAvatarHarness', () => {
         expect(resolveAvatarHarness(null, 'rig')).toBe('rig');
     });
 
+    it('recognizes DSH without confusing it with its model provider', () => {
+        expect(resolveAvatarHarness('acp', null, 'dsh')).toBe('dsh');
+        expect(resolveAvatarHarness('dsh')).toBe('dsh');
+        expect(resolveAvatarHarness('acp')).toBeNull();
+    });
+
     it('does not badge retired or unknown flavors', () => {
         expect(resolveAvatarHarness('gemini')).toBeNull();
         expect(resolveAvatarHarness('openclaw')).toBeNull();

@@ -618,8 +618,12 @@ export function getEffortLevelsForModel(
         const key = modelKey === 'default' ? metadata?.currentModelCode : modelKey;
         return mapMetadataOptions(key ? metadata?.modelReasoningEfforts?.[key] : undefined);
     }
-    if (flavor === 'dsh' || metadata?.agentName === 'dsh') return mapMetadataOptions(metadata?.thoughtLevels);
-    if (modelKey === 'default') return [];
+    if (flavor === 'dsh' || flavor === 'acp' || metadata?.agentName === 'dsh') {
+        if (!metadata?.version || !isWellFormedVersion(metadata.version) || compareVersionsWithPrerelease(metadata.version, '1.2.8') < 0) return [];
+        if (modelKey !== 'default' && metadata.currentModelCode && modelKey !== metadata.currentModelCode) return [];
+        return mapMetadataOptions(metadata.thoughtLevels);
+    }
+    if (modelKey === 'default' && flavor !== 'claude') return [];
     // Claude's effort scale is a property of the SDK rather than of the model:
     // one union for every model, and a level the chosen model cannot reach is
     // silently downgraded rather than rejected (sdk.d.ts:174). Codex is the

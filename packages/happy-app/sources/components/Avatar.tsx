@@ -21,6 +21,7 @@ interface AvatarProps {
     monochrome?: boolean;
     flavor?: string | null;
     clientId?: string | null;
+    agentName?: string | null;
     /** Where this avatar is rendered; omitted avatars never get a harness badge. */
     badgeLocation?: AvatarBadgeLocation;
     imageUrl?: string | null;
@@ -30,6 +31,7 @@ interface AvatarProps {
 const harnessIcons: Record<AvatarHarnessIcon, number> = {
     claude: require('@/assets/images/icon-claude.png'),
     codex: require('@/assets/images/icon-gpt.png'),
+    dsh: require('@/assets/agentport/dsh.svg'),
     agy: require('@/assets/images/icon-agy.png'),
     rig: require('@/assets/agentport/icon.svg'),
 };
@@ -71,7 +73,7 @@ const styles = StyleSheet.create((theme) => ({
 }));
 
 export const Avatar = React.memo((props: AvatarProps) => {
-    const { bot, flavor, clientId, badgeLocation = 'none', size = 48, imageUrl, thumbhash, ...avatarProps } = props;
+    const { bot, flavor, clientId, agentName, badgeLocation = 'none', size = 48, imageUrl, thumbhash, ...avatarProps } = props;
     const avatarStyle = normalizeAvatarStyle(useSetting('avatarStyle'));
     // The black-and-white preference applies to every generated style; a
     // caller passing monochrome explicitly (e.g. offline rows) still wins.
@@ -87,7 +89,7 @@ export const Avatar = React.memo((props: AvatarProps) => {
         : badgeLocation === 'sessionList'
             ? showFlavorIcons
             : false;
-    const effectiveHarness = resolveAvatarHarness(flavor, clientId);
+    const effectiveHarness = resolveAvatarHarness(flavor, clientId, agentName);
 
     if (bot && !imageUrl) {
         return (

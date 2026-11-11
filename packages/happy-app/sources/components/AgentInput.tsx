@@ -835,7 +835,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
     // layout. Desktop web, Mac Catalyst, and tablet-width canvases retain the
     // existing composer affordances rather than inheriting it.
     const runningOnMac = isRunningOnMac();
-    const compactMobileComposer = Platform.OS !== 'web' && !runningOnMac && screenWidth <= 700;
+    const compactMobileComposer = !runningOnMac && screenWidth <= 700;
     // iOS only. On Android the settings/model/effort triggers are React Native
     // subtrees hosted inside a Jetpack Compose DropdownMenu, and expo-modules-core
     // pins such a child to `Modifier.size(view.width, view.height)` sampled once at

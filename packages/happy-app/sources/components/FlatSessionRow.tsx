@@ -1,3 +1,4 @@
+import { getHarnessName } from '@/utils/harnessCatalog';
 import React from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -153,7 +154,7 @@ export const FlatSessionRow = React.memo(({ row, selected, showBorder, archived 
                     <View style={styles.titleContainer}>
                         {presentation.shimmerTitle ? (
                             <ShimmerText
-                                text={session.name}
+                                text={`${session.name}${session.flavor ? ' · ' + getHarnessName(session.flavor) : ''}`}
                                 style={styles.title}
                                 baseColor={theme.colors.textSecondary}
                                 highlightColor={theme.colors.text}
@@ -166,7 +167,7 @@ export const FlatSessionRow = React.memo(({ row, selected, showBorder, archived 
                                 ]}
                                 numberOfLines={1}
                             >
-                                {session.name}
+                                {session.name}{session.flavor ? ` · ${getHarnessName(session.flavor)}` : ''}
                             </Text>
                         )}
                     </View>

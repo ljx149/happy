@@ -90,7 +90,8 @@ export function useComposerModes(session: Session | null | undefined): ComposerM
         getEffortLevelsForModel(flavor, modelKey, metadata)
     ), [flavor, modelKey, metadata]);
     const effortLevel = React.useMemo<EffortLevel | null>(() => (
-        resolveCurrentOption(availableEffortLevels, [
+        !isRig && !session?.effortLevel && !explicitDefaults.effortLevel && !metadata?.currentThoughtLevelCode
+            ? null : resolveCurrentOption(availableEffortLevels, [
             session?.effortLevel,
             isRig ? undefined : explicitDefaults.effortLevel,
             isRig ? getRigReasoningSelection(metadata, modelKey) : metadata?.currentThoughtLevelCode,

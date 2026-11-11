@@ -3,9 +3,8 @@ import { View, ActivityIndicator, NativeScrollEvent, NativeSyntheticEvent } from
 import { StyleSheet, useUnistyles } from 'react-native-unistyles';
 import { SessionsList } from './SessionsList';
 import { EmptyMainScreen } from './EmptyMainScreen';
-import { ProjectHomeList } from './ProjectHomeList';
 import { useHasArchivedSessions, useVisibleSessionListViewData } from '@/hooks/useVisibleSessionListViewData';
-import { useAllMachines, useSetting, useSettingMutable } from '@/sync/storage';
+import { useAllMachines, useSettingMutable } from '@/sync/storage';
 import { collectMachineChoices } from '@/sync/machineChoices';
 import { LinkComputerChecklist } from './onboarding/LinkComputer';
 import { resolveHomeEmptyState } from './onboarding/firstRunOnboarding';
@@ -58,9 +57,8 @@ export const SessionsListWrapper = React.memo(({
     const machineChoices = React.useMemo(() => collectMachineChoices(machines), [machines]);
     const onlineMachineCount = machineChoices.filter((machine) => machine.online).length;
     const [, setHideArchivedSessions] = useSettingMutable('hideInactiveSessions');
-    // The activity-sorted chat list is the default; the project hierarchy —
-    // project, then checkout, with chats as tabs — is the other layout.
-    const groupByProject = useSetting('sessionListGrouping') === 'project';
+    // SessionsList already supports flat and full directory-grouped layouts.
+    // Keep every chat visible instead of routing projects to their latest chat.
     const styles = stylesheet;
 
     if (sessionListViewData === null) {
@@ -115,18 +113,6 @@ export const SessionsListWrapper = React.memo(({
         );
     }
 
-    if (groupByProject) {
-        return (
-            <View style={styles.container}>
-                <ProjectHomeList
-                    topContentInset={topContentInset}
-                    scrollIndicatorTopInset={scrollIndicatorTopInset}
-                    bottomContentInset={bottomContentInset}
-                    onScroll={onScroll}
-                />
-            </View>
-        );
-    }
 
     return (
         <View style={styles.container}>

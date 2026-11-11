@@ -1,3 +1,4 @@
+import { getHarnessName } from '@/utils/harnessCatalog';
 import React from 'react';
 import { View, Pressable, Platform } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -303,6 +304,7 @@ export const CompactSessionRow = React.memo(({ session, selected, showBorder }: 
             {...sessionPressHandlers}
             {...menuProps}
         >
+            <View style={{ marginRight: 8 }}><Avatar id={session.avatarId} size={28} flavor={session.flavor} clientId={session.clientId} badgeLocation="sessionList" /></View>
             <View style={styles.sessionContent}>
                 <View style={styles.sessionTitleRow}>
                     <Text
@@ -313,6 +315,7 @@ export const CompactSessionRow = React.memo(({ session, selected, showBorder }: 
                         numberOfLines={2}
                     >
                         {session.name}
+                        {session.flavor ? ` · ${getHarnessName(session.flavor)}` : ''}
                     </Text>
                     <SessionShortcutHintBadge
                         sessionId={session.id}
