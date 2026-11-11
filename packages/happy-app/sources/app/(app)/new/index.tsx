@@ -61,14 +61,14 @@ import {
 import {
     filterPermissionModesForCli,
     getHardcodedPermissionModes,
-    getHardcodedModelModes,
+    getAvailableModels,
     getEffortLevelsForModel,
     getSupportsWorktree,
-    includeConfiguredModel,
     type PermissionMode,
     type ModelMode,
     type EffortLevel,
 } from '@/components/modelModeOptions';
+import { findNewSessionModelCatalog } from '@/sync/newSessionModelCatalog';
 import { isRunningOnMac } from '@/utils/platform';
 import { getNewSessionSidebarLayout } from '@/utils/newSessionSidebarLayout';
 import { getAgentPickerItems, getModePickerItems } from '@/utils/newSessionPickerItems';
@@ -336,6 +336,9 @@ function PickerContent({
         return (
             <BubblePressable
                 key={item.key}
+                accessibilityRole="radio"
+                accessibilityLabel={item.label}
+                aria-checked={isSelected}
                 scaleFeedback={false}
                 style={(p) => [
                     pickerStyles.option,
@@ -1113,27 +1116,27 @@ function NewSessionScreen() {
             effortLevel: rigCreation.defaultEffortForModel(rigCreation.defaultModelKey),
         }
         : resolveAgentDefaultConfig(agentDefaultOverrides, selectedAgent, happyCliVersion), [agentDefaultOverrides, happyCliVersion, selectedAgent, rigCreation]);
-    const modelModes = React.useMemo<ModelMode[]>(
-        () => rigCreation?.models ?? includeConfiguredModel(
-            selectedAgent,
-            getHardcodedModelModes(selectedAgent, t),
-            effectiveAgentDefaults.modelMode,
-        ),
-        [selectedAgent, effectiveAgentDefaults.modelMode, rigCreation],
-    );
+    const reportedModelCatalog = React.useMemo(() => findNewSessionModelCatalog(
+        sessionList, placeMachineIds, selectedAgent, selectedPath, selectedHomeDir,
+    ), [sessionList, placeMachineIds, selectedAgent, selectedPath, selectedHomeDir]);
+    const modelModes = React.useMemo<ModelMode[]>(() => {
+        if (rigCreation) return rigCreation.models;
+        const reported = getAvailableModels(selectedAgent, reportedModelCatalog, t, effectiveAgentDefaults.modelMode);
+        return reported.some(model => model.key === 'default') ? reported
+            : [{ key: 'default', name: 'Use computer configuration' }, ...reported];
+    }, [selectedAgent, effectiveAgentDefaults.modelMode, rigCreation, reportedModelCatalog]);
 
     const currentModel = resolveSelectedOption(modelModes, modelIndex);
     const currentModelKey = currentModel?.key ?? 'default';
 
-    const effortLevels = React.useMemo<EffortLevel[]>(
-        () => rigCreation
-            ? rigCreation.effortsForModel(currentModelKey).map((key) => ({ key, name: key }))
-            : getEffortLevelsForModel(selectedAgent, currentModelKey),
-        [selectedAgent, currentModelKey, rigCreation],
-    );
+    const effortLevels = React.useMemo<EffortLevel[]>(() => {
+        if (rigCreation) return rigCreation.effortsForModel(currentModelKey).map(key => ({ key, name: key }));
+        const levels = getEffortLevelsForModel(selectedAgent, currentModelKey, reportedModelCatalog);
+        return levels.length ? [{ key: 'default', name: 'Use computer configuration' }, ...levels] : [];
+    }, [selectedAgent, currentModelKey, rigCreation, reportedModelCatalog]);
     const effectiveEffortDefault = rigCreation?.defaultEffortForModel(currentModelKey)
         ?? effectiveAgentDefaults.effortLevel;
-    const showModel = modelModes.length > 1;
+    const showModel = modelModes.length > 0;
     const showEffort = effortLevels.length > 0;
     const showPermission = permissionModes.length > 1;
 
@@ -1266,6 +1269,7 @@ function NewSessionScreen() {
     // nullable — the composer hides the picker instead of rendering a pick.
     const currentPermission = resolveSelectedOption(permissionModes, permissionIndex);
     const currentEffort = resolveSelectedOption(effortLevels, effortIndex);
+    const selectedEffortValue = !rigCreation && currentEffort?.key === 'default' ? undefined : currentEffort?.key;
     const permissionStyle = resolvePermissionStyle(currentPermission);
     const composerSettingsItems = React.useMemo(() => {
         const items: Array<{
@@ -1576,7 +1580,7 @@ function NewSessionScreen() {
                 worktree: worktreeSelection,
                 modelKey: currentModelKey,
                 permissionMode: permissionKey,
-                effort: currentEffort?.key ?? null,
+                effort: selectedEffortValue ?? null,
             }));
 
             // Handle worktree selection
@@ -1609,7 +1613,7 @@ function NewSessionScreen() {
                         approvedNewDirectoryCreation,
                         modelKey: currentModelKey,
                         permissionMode: permissionKey,
-                        effort: currentEffort?.key,
+                        effort: selectedEffortValue,
                     }),
                     ...(happyAgentTarget ? { happyAgentTarget } : {}),
                 }
@@ -1625,7 +1629,7 @@ function NewSessionScreen() {
                         ? permissionKey
                         : undefined,
                     modelMode: currentModelKey !== 'default' ? currentModelKey : undefined,
-                    effortLevel: currentEffort?.key,
+                    effortLevel: selectedEffortValue,
                 };
             let result = existingSessionId
                 ? { type: 'success' as const, sessionId: existingSessionId }
@@ -1666,7 +1670,7 @@ function NewSessionScreen() {
                         return;
                     }
 
-                    const currentEffortKey = currentEffort?.key ?? null;
+                    const currentEffortKey = selectedEffortValue ?? null;
                     // Pin the actual launch selection to this session. A
                     // later settings/default change must not silently rewrite
                     // an existing session's permission, model, or effort.
@@ -1740,7 +1744,7 @@ function NewSessionScreen() {
             if (sendingRef.current === controller) sendingRef.current = null;
             if (isMountedRef.current) setIsSpawning(false);
         }
-    }, [agentWorkspaces, allMachines, canPickWorktree, currentEffort?.key, currentModelKey, currentPermission?.key, draftProjectId, effectiveAgentDefaults.effortLevel, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.permissionMode, navigateToSession, picksWorkspaces, router, selectedAgent, selectedMachineId, selectedPath, selectedProjectId, worktreeKey]);
+    }, [agentWorkspaces, allMachines, canPickWorktree, selectedEffortValue, currentModelKey, currentPermission?.key, draftProjectId, effectiveAgentDefaults.effortLevel, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.permissionMode, navigateToSession, picksWorkspaces, router, selectedAgent, selectedMachineId, selectedPath, selectedProjectId, worktreeKey]);
 
     const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
     React.useEffect(() => {
@@ -2036,22 +2040,11 @@ function NewSessionScreen() {
                                             <Ionicons name="chevron-down" size={12} color={theme.colors.textSecondary} />
                                         </BubblePressable>
 
-                                        {showModel && (
-                                            <>
-                                                <Text style={[styles.configLabel, { color: theme.colors.textSecondary }]}>·</Text>
-                                                <BubblePressable scaleFeedback={false} onPress={() => togglePicker('model')} style={(p) => [styles.configInlineField, p.pressed && styles.configRowPressed]}>
-                                                    <Text style={[styles.configLabel, styles.configInlineText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-                                                        {currentModel?.name}
-                                                    </Text>
-                                                    <Ionicons name="chevron-down" size={12} color={theme.colors.textSecondary} />
-                                                </BubblePressable>
-                                            </>
-                                        )}
 
                                         {showEffort && (
                                             <>
                                                 <Text style={[styles.configLabel, { color: theme.colors.textSecondary }]}>·</Text>
-                                                <BubblePressable scaleFeedback={false} onPress={() => togglePicker('effort')} style={(p) => [styles.configInlineField, p.pressed && styles.configRowPressed]}>
+                                                <BubblePressable accessibilityRole="button" accessibilityLabel="Reasoning effort" scaleFeedback={false} onPress={() => togglePicker('effort')} style={(p) => [styles.configInlineField, p.pressed && styles.configRowPressed]}>
                                                     <Text style={[styles.configLabel, styles.configInlineText, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                                                         {currentEffort?.name}
                                                     </Text>
@@ -2060,6 +2053,28 @@ function NewSessionScreen() {
                                             </>
                                         )}
                                     </View>
+                                    {showModel && (
+                                        <BubblePressable
+                                            accessibilityRole="button"
+                                            accessibilityLabel="Model"
+                                            scaleFeedback={false}
+                                            onPress={() => togglePicker('model')}
+                                            style={(p) => [styles.configRow, p.pressed && styles.configRowPressed]}
+                                        >
+                                            <Ionicons name="cube-outline" size={15} color={theme.colors.textSecondary} />
+                                            <Text style={[styles.configLabel, { flex: 1 }]} numberOfLines={2}>
+                                                {t('agentInput.model.title')}: {currentModel?.name}
+                                            </Text>
+                                            <Ionicons name="chevron-down" size={14} color={theme.colors.textSecondary} />
+                                        </BubblePressable>
+                                    )}
+                                    {!rigCreation && (
+                                        <Text style={[styles.configLabel, { color: theme.colors.textSecondary, fontSize: 12, paddingHorizontal: 12 }]}>
+                                            {reportedModelCatalog
+                                                ? '此电脑在该目录最近上报的模型；启动后以运行器实际能力为准。'
+                                                : '尚未读取到该目录的模型列表。可沿用电脑配置启动，再在对话中选择模型。'}
+                                        </Text>
+                                    )}
                                     {renderActivePickerPopover('agent')}
                                     {renderActivePickerPopover('model')}
                                     {renderActivePickerPopover('effort')}
