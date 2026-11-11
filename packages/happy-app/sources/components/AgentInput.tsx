@@ -2058,8 +2058,6 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             ) : (
                                 <BubblePressable
                                     onPress={handleSettingsPress}
-                                    accessibilityRole="button"
-                                    accessibilityLabel={t('settings.title')}
                                     hitSlop={6}
                                     style={styles.mobilePermissionButton}
                                     accessibilityRole="button"
