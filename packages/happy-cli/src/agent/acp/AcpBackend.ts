@@ -915,6 +915,15 @@ export class AcpBackend implements AgentBackend {
 
     const ctx = this.createHandlerContext();
 
+    // ACP session titles are metadata, not assistant messages.
+    if (updateType === 'session_info_update') {
+      const title = (update as { title?: unknown }).title;
+      if (typeof title === 'string' && title.trim()) {
+        this.emit({ type: 'event', name: 'session_info_update', payload: { title } });
+      }
+      return;
+    }
+
     // Dispatch to appropriate handler based on update type
     if (sessionUpdateType === 'agent_message_chunk') {
       handleAgentMessageChunk(update as SessionUpdate, ctx);

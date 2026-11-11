@@ -57,12 +57,16 @@ function createMcpServer(handler: (title: string) => Promise<{ success: boolean;
     return mcp;
 }
 
-export async function startHappyServer(client: ApiSessionClient) {
+export async function startHappyServer(client: ApiSessionClient, onTitle?: (title: string) => void) {
     logger.debug(`[happyMCP] server:start sessionId=${client.sessionId}`);
 
     const handler = async (title: string) => {
         logger.debug('[happyMCP] Changing title to:', title);
         try {
+            if (onTitle) {
+                onTitle(title);
+                return { success: true };
+            }
             client.sendClaudeSessionMessage({
                 type: 'summary',
                 summary: title,

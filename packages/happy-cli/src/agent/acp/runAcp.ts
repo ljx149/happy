@@ -30,6 +30,8 @@ import {
 } from './sessionConfigMetadata';
 import type { SessionConfigOption, SessionModeState, SessionModelState } from '@agentclientprotocol/sdk';
 
+import { AcpSessionTitle, DSH_TITLE_INSTRUCTION } from './sessionTitle';
+
 const TURN_TIMEOUT_MS = 5 * 60 * 1000;
 const ACP_EVENT_PREVIEW_CHARS = 240;
 const ACP_RAW_PREVIEW_CHARS = 2000;
@@ -408,10 +410,12 @@ function resolveRequestedLegacyModelCode(models: SessionModelState, requested: s
 
 class GenericAcpPermissionHandler extends BasePermissionHandler implements AcpPermissionHandler {
   private readonly logPrefix: string;
+  private readonly autoTitle: boolean;
 
   constructor(session: ApiSessionClient, agentName: string) {
     super(session);
     this.logPrefix = `[${agentName}]`;
+    this.autoTitle = agentName === 'dsh';
   }
 
   protected getLogPrefix(): string {
@@ -419,6 +423,13 @@ class GenericAcpPermissionHandler extends BasePermissionHandler implements AcpPe
   }
 
   async handleToolCall(toolCallId: string, toolName: string, input: unknown): Promise<PermissionResult> {
+    // Only the namespaced local metadata tool is exempt from approval.
+    // Never infer permission from a generic "other" kind or a tool-call ID.
+    if (this.autoTitle && toolName === 'mcp__happy__change_title'
+      && isRecord(input) && typeof input.title === 'string'
+      && Object.keys(input).every(key => key === 'title')) {
+      return { decision: 'approved' };
+    }
     return new Promise<PermissionResult>((resolve, reject) => {
       this.pendingRequests.set(toolCallId, {
         resolve,
@@ -534,7 +545,12 @@ export async function runAcp(opts: {
   let sawModes = false;
   let sawModels = false;
 
-  const happyServer = await startHappyServer(session);
+  const titles = opts.agentName === 'dsh' ? new AcpSessionTitle() : null;
+  const updateTitle = (title: unknown, fallback = false) => {
+    if (titles) session.updateMetadata(meta => titles.apply(meta, title, fallback));
+  };
+  let titleInstructionSent = false;
+  const happyServer = await startHappyServer(session, titles ? title => updateTitle(title) : undefined);
   const mcpServers = {
     happy: {
       command: join(projectPath(), 'bin', 'happy-mcp.mjs'),
@@ -706,6 +722,11 @@ export async function runAcp(opts: {
       logAcp('muted', `Outgoing raw backend message from ${opts.agentName}: ${formatUnknownForConsole(msg, ACP_RAW_PREVIEW_CHARS)}`);
     }
 
+    if (msg.type === 'event' && msg.name === 'session_info_update') {
+      updateTitle((msg.payload as { title?: unknown })?.title);
+      return;
+    }
+
     if (msg.type === 'event' && msg.name === 'available_commands') {
       const commands = msg.payload as { name: string; description?: string }[];
       const commandNames = commands.map((c) => c.name);
@@ -875,6 +896,7 @@ export async function runAcp(opts: {
 
     if (message.meta && Object.prototype.hasOwnProperty.call(message.meta, 'effort')) currentEffort = message.meta.effort ?? null;
 
+    updateTitle(message.content.text, true);
     messageQueue.push(message.content.text, {
       permissionMode: currentPermissionMode,
       model: currentModel,
@@ -953,7 +975,13 @@ export async function runAcp(opts: {
           await switchModelIfRequested(batch.mode.model);
         }
         if (batch.mode.effort) await switchEffortIfRequested(batch.mode.effort);
-        await backend.sendPrompt(acpSessionId, batch.message);
+        const prompt = titles && !titleInstructionSent
+          ? `${DSH_TITLE_INSTRUCTION}
+
+${batch.message}`
+          : batch.message;
+        await backend.sendPrompt(acpSessionId, prompt);
+        titleInstructionSent = true;
         await turnEnded;
         sendEnvelopes(sessionManager.endTurn('completed'));
         session.sendSessionEvent({ type: 'ready' });

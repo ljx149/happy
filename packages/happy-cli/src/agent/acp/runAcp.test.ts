@@ -226,6 +226,38 @@ describe('runAcp', () => {
     });
   });
 
+  it('names DSH from the first prompt and syncs runtime and MCP title updates', async () => {
+    let metadata: any = { path: '/tmp', host: 'test' };
+    mocks.mockSession.updateMetadata.mockImplementation(handler => { metadata = handler(metadata); });
+    const runPromise = runAcp({
+      credentials: { token: 'token', encryption: { type: 'legacy', secret: new Uint8Array(32) } },
+      agentName: 'dsh', command: 'dsh', args: ['--profile', 'acp'],
+    });
+    await vi.waitFor(() => expect(mocks.getUserMessageHandler()).toBeTypeOf('function'));
+    mocks.getUserMessageHandler()!({ content: { text: '修复登录页面' } });
+    await vi.waitFor(() => expect(mocks.backendState.prompts).toHaveLength(1));
+    expect(metadata.summary.text).toBe('修复登录页面');
+    await expect(mocks.backendState.constructorArgs.permissionHandler.handleToolCall('title-1', 'mcp__happy__change_title', { title: '标题' })).resolves.toEqual({ decision: 'approved' });
+    expect(mocks.backendState.prompts[0].prompt).toContain('mcp__happy__change_title');
+    expect(mocks.backendState.prompts[0].prompt).toContain('修复登录页面');
+    for (const listener of mocks.backendState.listeners) listener({ type: 'event', name: 'session_info_update', payload: { title: '登录修复' } });
+    expect(metadata.summary.text).toBe('登录修复');
+    const onTitle = mocks.mockStartHappyServer.mock.calls[0][1] as (title: string) => void;
+    onTitle('修复登录验证');
+    expect(metadata.summary.text).toBe('修复登录验证');
+    mocks.getUserMessageHandler()!({ content: { text: '继续' } });
+    await vi.waitFor(() => expect(mocks.backendState.prompts).toHaveLength(2));
+    expect(mocks.backendState.prompts[1].prompt).toBe('继续');
+    let unsafeApproved = false;
+    const unsafe = mocks.backendState.constructorArgs.permissionHandler.handleToolCall('change_title-unsafe', 'mcp__happy__change_title_and_run', { title: '标题' }).then(() => { unsafeApproved = true; }).catch(() => {});
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(unsafeApproved).toBe(false);
+    metadata = { ...metadata, name: '手动标题' };
+    onTitle('不能覆盖');
+    expect(metadata.summary.text).toBe('修复登录验证');
+    await mocks.getKillHandler()!(); await runPromise; await unsafe;
+  });
+
   it('wires backend messages through mapper into session envelopes', async () => {
     const runPromise = runAcp({
       credentials: { token: 'token', encryption: { type: 'legacy', secret: new Uint8Array(32) } },
