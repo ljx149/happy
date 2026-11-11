@@ -31,7 +31,7 @@ interface AvatarProps {
 const harnessIcons: Record<AvatarHarnessIcon, number> = {
     claude: require('@/assets/images/icon-claude.png'),
     codex: require('@/assets/images/icon-gpt.png'),
-    dsh: require('@/assets/agentport/dsh.svg'),
+    dsh: require('@/assets/agentport/deepseek.png'),
     agy: require('@/assets/images/icon-agy.png'),
     rig: require('@/assets/agentport/icon.svg'),
 };
@@ -90,6 +90,21 @@ export const Avatar = React.memo((props: AvatarProps) => {
             ? showFlavorIcons
             : false;
     const effectiveHarness = resolveAvatarHarness(flavor, clientId, agentName);
+
+    // Conversation identity is the harness itself, not a generated project avatar.
+    if (badgeLocation !== 'none' && effectiveHarness && ['claude', 'codex', 'dsh'].includes(effectiveHarness)) {
+        return (
+            <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', borderRadius: size / 2, backgroundColor: effectiveHarness === 'dsh' ? '#fff' : theme.colors.surface, overflow: 'hidden' }}>
+                <Image
+                    accessibilityLabel={effectiveHarness === 'dsh' ? 'DeepSeek' : effectiveHarness === 'claude' ? 'Claude' : 'GPT'}
+                    source={harnessIcons[effectiveHarness]}
+                    contentFit="contain"
+                    style={{ width: size * 0.85, height: size * 0.85 }}
+                    tintColor={effectiveHarness === 'codex' ? theme.colors.text : undefined}
+                />
+            </View>
+        );
+    }
 
     if (bot && !imageUrl) {
         return (

@@ -8,7 +8,6 @@ import { Typography } from '@/constants/Typography';
 import { t } from '@/text';
 import { ProjectGroupData, ProjectWorkspaceGroup, useSessionGitStatus } from '@/sync/storage';
 import { CompactSessionRow } from './ActiveSessionsGroupCompact';
-import { Avatar } from './Avatar';
 import { requestHomeDockFocus } from './homeDockFocus';
 import { useNewSessionDraft } from '@/hooks/useNewSessionDraft';
 import { formatPathRelativeToHome } from '@/utils/sessionUtils';
@@ -16,8 +15,6 @@ import { visibleRigGitLineChanges } from '@/utils/rigGitLineChanges';
 import { GitLineChanges } from './GitLineChanges';
 import { getRepoPath, isWorktreePath } from '@/utils/worktreePaths';
 
-// Tall enough to span the name and branch lines together.
-const HEADER_AVATAR_SIZE = 30;
 // Roughly 70% of the composer attachment "+": same feel, less presence in a
 // list header. hitSlop keeps the touch target comfortable.
 const ADD_BUTTON_SIZE = 30;
@@ -59,6 +56,7 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId }: 
     const styles = stylesheet;
     const { theme } = useUnistyles();
     const router = useRouter();
+    const [expanded, setExpanded] = React.useState(true);
     const firstSession = workspace.sessions[0];
     const worktreeName = workspace.name ?? (workspace.id || null);
 
@@ -110,21 +108,27 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId }: 
     return (
         <View style={styles.section}>
             <View style={styles.header}>
-                {firstSession && (
-                    <Avatar id={firstSession.avatarId} size={HEADER_AVATAR_SIZE} flavor={null} imageUrl={firstSession.projectAvatarUri} thumbhash={firstSession.projectAvatarThumbhash} />
-                )}
-                <View style={styles.headerText}>
-                    <Text style={styles.title} numberOfLines={1}>
-                        {project.name}
-                    </Text>
-                    <Text style={styles.branchText} numberOfLines={2}>{firstSession?.machineName} · {firstSession?.path}</Text>
-                    <View style={styles.branchLine}>
-                        <Text style={styles.branchText} numberOfLines={1}>
-                            {branchName}
+                <Pressable
+                    onPress={() => setExpanded(value => !value)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${project.name} (${workspace.sessions.length})`}
+                    aria-expanded={expanded}
+                    style={styles.directoryToggle}
+                >
+                    <Ionicons name={expanded ? 'chevron-down' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} />
+                    <View style={styles.headerText}>
+                        <Text style={styles.title} numberOfLines={1}>
+                            {project.name} ({workspace.sessions.length})
                         </Text>
-                        <GitLineChanges changes={changes} />
+                        <Text style={styles.branchText} numberOfLines={2}>{firstSession?.machineName} · {firstSession?.path}</Text>
+                        <View style={styles.branchLine}>
+                            <Text style={styles.branchText} numberOfLines={1}>
+                                {branchName}
+                            </Text>
+                            <GitLineChanges changes={changes} />
+                        </View>
                     </View>
-                </View>
+                </Pressable>
                 <Pressable
                     onPress={handleNewSession}
                     hitSlop={12}
@@ -136,7 +140,7 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId }: 
                 </Pressable>
             </View>
 
-            <View style={styles.workspaceCard}>
+            {expanded && <View style={styles.workspaceCard}>
                 {workspace.sessions.map((session, index) => (
                     <CompactSessionRow
                         key={session.id}
@@ -145,7 +149,7 @@ const WorkspaceSection = React.memo(({ project, workspace, selectedSessionId }: 
                         showBorder={index < workspace.sessions.length - 1}
                     />
                 ))}
-            </View>
+            </View>}
         </View>
     );
 });
@@ -171,6 +175,7 @@ const stylesheet = StyleSheet.create((theme) => ({
         paddingRight: Platform.select({ ios: 26, default: 22 }),
         gap: 8,
     },
+    directoryToggle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
     headerText: {
         flex: 1,
         minWidth: 0,

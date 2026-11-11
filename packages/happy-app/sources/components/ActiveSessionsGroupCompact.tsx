@@ -57,8 +57,8 @@ function useSectionGitInfo(sessionId: string) {
     }, [gitStatus]);
 }
 
-// Section header: avatar | path + branch + tree icon + line changes | + button
-const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRowData; displayPath: string }) => {
+// Directory header: disclosure | path + branch | new session
+const SectionHeader = React.memo(({ session, displayPath, expanded, onToggle }: { session: SessionRowData; displayPath: string; expanded: boolean; onToggle: () => void }) => {
     const styles = stylesheet;
     const { theme } = useUnistyles();
     const router = useRouter();
@@ -99,38 +99,35 @@ const SectionHeader = React.memo(({ session, displayPath }: { session: SessionRo
             // @ts-ignore - Web only events
             onMouseLeave={() => setIsHovered(false)}
         >
-            {/* Avatar — vertically centered */}
-            <View style={styles.sectionHeaderAvatar}>
-                <Avatar bot={!!session.botId} id={session.avatarId} size={24} flavor={null} imageUrl={session.avatarUri} thumbhash={session.avatarThumbhash} />
-            </View>
-
-            {/* Path + branch */}
-            <View style={styles.sectionHeaderContent}>
-                <Text style={styles.sectionHeaderPath} numberOfLines={1}>
-                    {repoFolderName}
-                </Text>
-                {hasBranch && (
-                    <View style={styles.branchRow}>
-                        <Text style={styles.branchText} numberOfLines={1}>
-                            {branchName}
-                        </Text>
-                        {isWorktree && (
-                            <MaterialCommunityIcons
-                                name="tree"
-                                size={11}
-                                color={theme.colors.textSecondary}
-                                style={styles.worktreeIcon}
-                            />
-                        )}
-                        {gitInfo.linesAdded > 0 && (
-                            <Text style={styles.addedText}>+{gitInfo.linesAdded}</Text>
-                        )}
-                        {gitInfo.linesRemoved > 0 && (
-                            <Text style={styles.removedText}>-{gitInfo.linesRemoved}</Text>
-                        )}
-                    </View>
-                )}
-            </View>
+            <Pressable onPress={onToggle} accessibilityRole="button" accessibilityLabel={displayPath} aria-expanded={expanded} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}>
+                <Ionicons name={expanded ? 'chevron-down' : 'chevron-forward'} size={18} color={theme.colors.textSecondary} />
+                <View style={styles.sectionHeaderContent}>
+                    <Text style={styles.sectionHeaderPath} numberOfLines={1}>
+                        {repoFolderName}
+                    </Text>
+                    {hasBranch && (
+                        <View style={styles.branchRow}>
+                            <Text style={styles.branchText} numberOfLines={1}>
+                                {branchName}
+                            </Text>
+                            {isWorktree && (
+                                <MaterialCommunityIcons
+                                    name="tree"
+                                    size={11}
+                                    color={theme.colors.textSecondary}
+                                    style={styles.worktreeIcon}
+                                />
+                            )}
+                            {gitInfo.linesAdded > 0 && (
+                                <Text style={styles.addedText}>+{gitInfo.linesAdded}</Text>
+                            )}
+                            {gitInfo.linesRemoved > 0 && (
+                                <Text style={styles.removedText}>-{gitInfo.linesRemoved}</Text>
+                            )}
+                        </View>
+                    )}
+                </View>
+            </Pressable>
 
             {/* + button — vertically centered, large hit area; desktop: hover-only */}
             <Pressable
@@ -169,6 +166,7 @@ const MachineSeparator = React.memo(({ machineName, machineId }: { machineName: 
 export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: ActiveSessionsGroupProps) {
     const styles = stylesheet;
     const machines = useAllMachines();
+    const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
 
     const machineGroups = React.useMemo(() => buildActiveSessionDisplayGroups(
         sessions,
@@ -193,6 +191,7 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
                             />
                         )}
                         {sortedProjects.map(([projectPath, projectGroup]) => {
+                            const groupKey = JSON.stringify([machineGroup.machineId, projectPath]);
                             const firstSession = projectGroup.sessions[0];
                             if (!firstSession) return null;
 
@@ -201,8 +200,10 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
                                     <SectionHeader
                                         session={firstSession}
                                         displayPath={projectGroup.displayPath}
+                                        expanded={!collapsed[groupKey]}
+                                        onToggle={() => setCollapsed(value => ({ ...value, [groupKey]: !value[groupKey] }))}
                                     />
-                                    <View style={styles.projectCard}>
+                                    {!collapsed[groupKey] && <View style={styles.projectCard}>
                                         {projectGroup.sessions.map((session, index) => (
                                             <CompactSessionRow
                                                 key={session.id}
@@ -211,7 +212,7 @@ export function ActiveSessionsGroupCompact({ sessions, selectedSessionId }: Acti
                                                 showBorder={index < projectGroup.sessions.length - 1}
                                             />
                                         ))}
-                                    </View>
+                                    </View>}
                                 </View>
                             );
                         })}
@@ -385,9 +386,6 @@ const stylesheet = StyleSheet.create((theme) => ({
         paddingHorizontal: Platform.select({ ios: 32, default: 24 }),
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    sectionHeaderAvatar: {
-        marginRight: 8,
     },
     sectionHeaderContent: {
         flex: 1,
