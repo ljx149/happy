@@ -180,3 +180,9 @@ button, .button { border-radius: 10px; }
 .model-settings label { flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .model-settings input, .model-settings select { width: 100%; min-width: 0; }
 .model-settings .hint { flex-basis: 100%; margin: 0; }
+
+.message-thinking, .message-tool { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; color: var(--muted); }
+.message summary { cursor: pointer; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.message-state { display: inline-block; margin-left: 12px; font-size: 12px; font-weight: 400; color: var(--muted); }
+.message-detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow-y: auto; font-size: 13px; line-height: 1.65; }
+.message-event { font-size: 13px; color: var(--muted); }

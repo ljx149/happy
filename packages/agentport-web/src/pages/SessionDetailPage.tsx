@@ -6,12 +6,12 @@ import { MessageContentSchema, UserMessageSchema } from '@slopus/happy-wire';
 import * as api from '../lib/api.ts';
 import { decryptRecord, encryptRecord, unwrapKey } from '../lib/protocol.ts';
 import { buildPermissionPayload, encodePermissionPayload, permissionRpcMethod, extractPendingRequests } from '../lib/permission.ts';
-import { errorText, field, messageText, type Account } from '../lib/account.ts';
+import { errorText, field, type Account } from '../lib/account.ts';
 
-type Message = { id: string; author: string; text: string };
+import { conversationUpdates, mergeChatUpdates, type ChatRow, type ChatUpdate } from '../lib/conversation';
 
 export function SessionDetailPage({ account, id }: { account: Account; id: string }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatRow[]>([]);
   const [syncError, setSyncError] = useState('');
   const [sendError, setSendError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -67,16 +67,15 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
                 const value = await decryptRecord(message.content.c, key);
                 const parsed = MessageContentSchema.safeParse(value);
                 const content = parsed.success ? parsed.data : value;
-                const role = field(content, 'role') === 'session' ? field(field(content, 'content'), 'role') : field(content, 'role');
-                return { id: message.id, author: role === 'user' ? '你' : 'Agent', text: messageText(content) };
+                return conversationUpdates(message.id, content);
               } catch {
-                return { id: message.id, author: '系统', text: '此消息无法解密。' };
+                return [{ id: message.id, kind: 'event', text: '此消息无法解密。' }] satisfies ChatUpdate[];
               }
             }));
             if (!active) return;
             cursor = page.messages.at(-1)?.seq ?? cursor;
             more = page.hasMore && page.messages.length > 0;
-            setMessages(current => [...current, ...decoded.filter(message => message.text)]);
+            setMessages(current => mergeChatUpdates(current, decoded.flat()));
           }
           setLoaded(true);
           setSyncError('');
@@ -182,9 +181,16 @@ export function SessionDetailPage({ account, id }: { account: Account; id: strin
       {loaded && legacy && <p role="status">此会话由旧版设备创建，使用 legacy 加密，当前浏览器客户端暂不支持读取或发送。可在工作台列表中查看，但无法在此对话。</p>}
       {loaded && !legacy && !messages.length && <p>暂无消息。</p>}
       {loaded && !sessionActive && <p role="status">此会话的 Agent 当前离线，发送的消息需要等待它恢复后才会处理。也可返回工作台新建会话。</p>}
-      {messages.map(message => <div className="message" key={message.id} data-author={message.author}>
-        <strong>{message.author}</strong>{message.text}
-      </div>)}
+      {messages.map(message => message.kind === 'thinking' || message.kind === 'tool'
+        ? <details className={`message message-${message.kind}`} key={message.id}>
+          <summary>{message.kind === 'thinking' ? '思考过程' : message.text}
+            <span className="message-state">{message.kind === 'thinking' ? '点击展开' : message.ended ? '已结束' : '工具记录'}</span>
+          </summary>
+          <div className="message-detail">{message.kind === 'thinking' ? message.text : message.detail || '此版本运行器未提供操作详情。'}</div>
+        </details>
+        : <div className={`message message-${message.kind}`} key={message.id} data-author={message.kind === 'user' ? '你' : 'Agent'}>
+          <strong>{message.kind === 'user' ? '你' : message.kind === 'event' ? '状态' : 'Agent'}</strong>{message.text}
+        </div>)}
     </div>
     {permRequests.length > 0 && !legacy && <div className="perm-list" aria-label="待审批请求" aria-live="polite">
       {permRequests.map(req => {

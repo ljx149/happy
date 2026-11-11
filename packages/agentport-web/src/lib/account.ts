@@ -26,6 +26,7 @@ export function messageText(value: unknown): string {
   const content = field(value, 'content');
   const data = field(content, 'data');
   const event = field(content, 'ev');
+  if (field(event, 't') === 'service' && !label(event, 'text')) return '';
   if (['turn-start', 'start', 'stop', 'tool-call-end'].includes(String(field(event, 't')))) return '';
   if (field(event, 't') === 'tool-call-start') return `工具：${label(event, 'title') ?? label(event, 'name') ?? '执行操作'}${label(event, 'description') ? '\n' + label(event, 'description') : ''}`;
   if (field(event, 't') === 'file') return `文件：${label(event, 'name') ?? label(event, 'ref') ?? '附件'}`;
