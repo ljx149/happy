@@ -109,6 +109,7 @@ const agentIcons = {
     rig: require('@/assets/agentport/icon.svg'),
     claude: require('@/assets/images/icon-claude.png'),
     codex: require('@/assets/images/icon-gpt.png'),
+    dsh: require('@/assets/agentport/icon.svg'),
     openclaw: require('@/assets/images/icon-openclaw.png'),
     gemini: require('@/assets/images/icon-gemini.png'),
     agy: require('@/assets/images/icon-agy.png'),
@@ -120,6 +121,7 @@ type AgentKey = NewSessionAgentType;
 const ALL_AGENTS: { key: AgentKey; label: string }[] = [
     { key: 'claude', label: 'claude code' },
     { key: 'codex', label: 'codex' },
+    { key: 'dsh', label: 'DSH' },
     { key: 'agy', label: 'antigravity' },
     { key: 'rig', label: 'AgentPort' },
 ];
@@ -1671,7 +1673,7 @@ function NewSessionScreen() {
                     if (!spawnRigCreation) {
                         sessionSetAgentModes(result.sessionId, {
                             permissionMode: permissionKey,
-                            modelMode: currentModelKey,
+                            modelMode: currentModelKey === 'default' ? null : currentModelKey,
                             effortLevel: currentEffortKey,
                         });
                     }

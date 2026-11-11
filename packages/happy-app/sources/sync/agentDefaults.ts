@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { compareVersionsWithPrerelease, isWellFormedVersion } from '@/utils/versionUtils';
 
-export const agentKeys = ['claude', 'codex', 'gemini', 'openclaw', 'agy'] as const;
+export const agentKeys = ['claude', 'dsh', 'codex', 'gemini', 'openclaw', 'agy'] as const;
 export type AgentKey = typeof agentKeys[number];
 
 export const AgentDefaultOverrideSchema = z.object({
@@ -13,6 +13,7 @@ export const AgentDefaultOverrideSchema = z.object({
 export const AgentDefaultOverridesSchema = z.object({
     claude: AgentDefaultOverrideSchema.optional(),
     codex: AgentDefaultOverrideSchema.optional(),
+    dsh: AgentDefaultOverrideSchema.optional(),
     gemini: AgentDefaultOverrideSchema.optional(),
     openclaw: AgentDefaultOverrideSchema.optional(),
     agy: AgentDefaultOverrideSchema.optional(),
@@ -29,11 +30,11 @@ export type AgentDefaultConfig = {
 };
 
 const codeAgentDefaults: Record<AgentKey, AgentDefaultConfig> = {
-    // Auto is the reviewed everyday mode for both shipped code agents. The
-    // old CLI fallback is applied only when a machine version is known below;
-    // a user override is kept separate and is never rewritten here.
-    claude: { permissionMode: 'auto', modelMode: 'claude-opus-5-5', effortLevel: 'medium' },
-    codex: { permissionMode: 'auto', modelMode: 'gpt-6.1-sol', effortLevel: 'medium' },
+    // AgentPort inherits each computer's model and effort. Permission changes
+    // remain explicit; new sessions start in the reviewed default mode.
+    claude: { permissionMode: 'default', modelMode: 'default', effortLevel: null },
+    codex: { permissionMode: 'default', modelMode: 'default', effortLevel: null },
+    dsh: { permissionMode: 'default', modelMode: 'default', effortLevel: null },
     gemini: { permissionMode: 'default', modelMode: 'gemini-2.5-pro', effortLevel: null },
     openclaw: { permissionMode: 'default', modelMode: 'default', effortLevel: null },
     agy: { permissionMode: 'default', modelMode: 'Gemini 3.8 Flash', effortLevel: 'medium' },
@@ -84,7 +85,7 @@ function resolveCodeDefaultModelMode(
 }
 
 export function normalizeAgentKey(flavor: string | null | undefined): AgentKey {
-    if (flavor === 'codex' || flavor === 'gemini' || flavor === 'openclaw' || flavor === 'agy') {
+    if (flavor === 'dsh' || flavor === 'codex' || flavor === 'gemini' || flavor === 'openclaw' || flavor === 'agy') {
         return flavor;
     }
     return 'claude';

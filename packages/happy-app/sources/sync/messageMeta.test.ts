@@ -72,7 +72,7 @@ describe('resolveMessageDeliveryMeta', () => {
 });
 
 describe('resolveMessageModeMeta', () => {
-    it('reasserts the displayed codex defaults after abort clears session overrides', () => {
+    it('does not override computer settings after abort clears session overrides', () => {
         const meta = resolveMessageModeMeta({
             permissionMode: null,
             modelMode: null,
@@ -80,11 +80,7 @@ describe('resolveMessageModeMeta', () => {
             metadata: { flavor: 'codex' },
         } as any);
 
-        expect(meta).toEqual({
-            permissionMode: 'auto',
-            model: 'gpt-5.6-sol',
-            effort: 'medium',
-        });
+        expect(meta).toEqual({});
     });
 
     it('always sends the displayed Agy model and effort pair', () => {
@@ -110,7 +106,7 @@ describe('resolveMessageModeMeta', () => {
             metadata: { flavor: 'codex', version: '1.2.0' },
         } as any);
 
-        expect(meta.permissionMode).toBe('default');
+        expect(meta.permissionMode).toBeUndefined();
     });
 
     it('uses Auto for an unset Codex code default on a new CLI', () => {
@@ -121,7 +117,7 @@ describe('resolveMessageModeMeta', () => {
             metadata: { flavor: 'codex', version: '1.2.1-beta.2' },
         } as any);
 
-        expect(meta.permissionMode).toBe('auto');
+        expect(meta.permissionMode).toBeUndefined();
     });
 
     it('keeps an explicit Codex YOLO override on an old CLI', () => {
@@ -243,7 +239,7 @@ describe('resolveMessageModeMeta', () => {
             permissionMode: 'read-only',
             modelMode: 'gpt-5.6-terra',
             effortLevel: 'high',
-            metadata: { flavor: 'codex' },
+            metadata: { flavor: 'codex', modelReasoningEfforts: { 'gpt-5.6-terra': [{ code: 'high', value: 'High' }, { code: 'xhigh', value: 'Extra high' }] } },
         } as any);
 
         expect(meta).toEqual({
@@ -281,7 +277,7 @@ describe('resolveMessageModeMeta', () => {
             permissionMode: 'default',
             modelMode: 'gpt-5.6-terra',
             effortLevel: 'xhigh',
-            metadata: { flavor: 'codex' },
+            metadata: { flavor: 'codex', modelReasoningEfforts: { 'gpt-5.6-terra': [{ code: 'high', value: 'High' }, { code: 'xhigh', value: 'Extra high' }] } },
         } as any, {
             agentDefaultOverrides: {
                 codex: {
@@ -308,9 +304,7 @@ describe('resolveMessageModeMeta', () => {
         } as any);
 
         expect(meta).toEqual({
-            permissionMode: 'auto',
             model: 'my-workspace-model',
-            effort: 'medium',
         });
     });
 
@@ -327,9 +321,7 @@ describe('resolveMessageModeMeta', () => {
         } as any);
 
         expect(meta).toEqual({
-            permissionMode: 'auto',
             model: 'my-workspace-model',
-            effort: 'medium',
         });
     });
 
@@ -338,7 +330,7 @@ describe('resolveMessageModeMeta', () => {
             permissionMode: 'read-only',
             modelMode: null,
             effortLevel: null,
-            metadata: { flavor: 'codex' },
+            metadata: { flavor: 'codex', modelReasoningEfforts: { 'gpt-5.6-terra': [{ code: 'high', value: 'High' }, { code: 'xhigh', value: 'Extra high' }] } },
         } as any, {
             agentDefaultOverrides: {
                 codex: {
@@ -356,7 +348,7 @@ describe('resolveMessageModeMeta', () => {
         });
     });
 
-    it('treats an explicit claude default model as a reset override', () => {
+    it('leaves the computer model unchanged for the default selection', () => {
         const meta = resolveMessageModeMeta({
             permissionMode: null,
             modelMode: 'default',
@@ -364,7 +356,7 @@ describe('resolveMessageModeMeta', () => {
             metadata: { flavor: 'claude' },
         } as any);
 
-        expect(meta).toEqual({ model: null });
+        expect(meta).toEqual({});
     });
 
     it('never sends the claude code-default model to a session with no pick', () => {

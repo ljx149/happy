@@ -333,6 +333,7 @@ export function filterPermissionModesForCli<T extends ModeOption>(
 }
 
 export function getHardcodedPermissionModes(flavor: AgentFlavor, translate: Translate): PermissionMode[] {
+    if (flavor === 'dsh' || flavor === 'acp') return [{ key: 'default', name: 'DSH ACP permissions' }];
     if (flavor === 'codex') {
         return getCodexPermissionModes(translate);
     }
@@ -367,9 +368,10 @@ export function getAgyModelModes(): ModelMode[] {
 }
 
 export function getHardcodedModelModes(flavor: AgentFlavor, _translate: Translate): ModelMode[] {
-    if (flavor === 'codex') {
-        return getCodexModelModes();
+    if (flavor === 'dsh' || flavor === 'acp' || flavor === 'codex' || flavor === 'claude') {
+        return [{ key: 'default', name: 'Use computer configuration' }];
     }
+
     if (flavor === 'gemini') {
         return getGeminiModelModes();
     }
@@ -440,9 +442,9 @@ export function getAvailableModels(
     const metadataModels = mapMetadataOptions(metadata?.models);
     if (metadataModels.length > 0) {
         if (flavor === 'codex' && !metadataModels.some((model) => model.key === 'default')) {
-            return [{ key: 'default', name: 'default model', description: null }, ...metadataModels];
+            return includeConfiguredModel(flavor, [{ key: 'default', name: 'default model', description: null }, ...metadataModels], selectedKey);
         }
-        return metadataModels;
+        return includeConfiguredModel(flavor, metadataModels, selectedKey);
     }
     return includeConfiguredModel(
         flavor,
@@ -612,6 +614,12 @@ export function getEffortLevelsForModel(
             name: effortDisplayName(level),
         }));
     }
+    if (flavor === 'codex') {
+        const key = modelKey === 'default' ? metadata?.currentModelCode : modelKey;
+        return mapMetadataOptions(key ? metadata?.modelReasoningEfforts?.[key] : undefined);
+    }
+    if (flavor === 'dsh' || metadata?.agentName === 'dsh') return mapMetadataOptions(metadata?.thoughtLevels);
+    if (modelKey === 'default') return [];
     // Claude's effort scale is a property of the SDK rather than of the model:
     // one union for every model, and a level the chosen model cannot reach is
     // silently downgraded rather than rejected (sdk.d.ts:174). Codex is the
@@ -620,9 +628,7 @@ export function getEffortLevelsForModel(
     if (flavor === 'claude') {
         return getClaudeEffortLevels();
     }
-    if (flavor === 'codex') {
-        return getCodexEffortLevels(modelKey);
-    }
+
     if (flavor === 'agy') {
         return getAgyEffortLevels(modelKey);
     }

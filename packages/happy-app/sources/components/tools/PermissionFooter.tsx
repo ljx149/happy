@@ -137,6 +137,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
     const [loadingForSession, setLoadingForSession] = useState(false);
     
     // Check if this is a Codex session - check both metadata.flavor and tool name prefix
+    const isAcp = metadata?.flavor === 'acp' || metadata?.agentName === 'dsh';
     const isCodex = metadata?.flavor === 'codex' || toolName.startsWith('Codex');
 
     const handleApprove = async () => {
@@ -149,7 +150,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
             // 'default' — mirror that here, otherwise the next message's meta
             // still carries the stale 'plan' and pushes the SDK back into
             // plan mode, undoing the approval.
-            if (toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode') {
+            if (!isAcp && (toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode')) {
                 sessionSetAgentModes(sessionId, { permissionMode: 'default' });
             }
         } catch (error) {
@@ -523,7 +524,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                 })}
 
                 {/* Allow All Edits button - only show for Edit and MultiEdit tools */}
-                {(toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'Write' || toolName === 'NotebookEdit' || toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode') && (
+                {!isAcp && (toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'Write' || toolName === 'NotebookEdit' || toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode') && (
                     renderPermissionButton({
                         label: t('claude.permissions.yesAllowAllEdits'),
                         loading: loadingAllEdits,
@@ -545,7 +546,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                 )}
 
                 {/* Bypass all permissions (yolo mode) - only show for ExitPlanMode */}
-                {(toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode') && (
+                {!isAcp && (toolName === 'exit_plan_mode' || toolName === 'ExitPlanMode') && (
                     renderPermissionButton({
                         label: t('claude.permissions.yesAllowEverything'),
                         loading: loadingBypass,
@@ -567,7 +568,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                 )}
 
                 {/* Allow for session button - only show for non-edit, non-exit-plan tools */}
-                {toolName && toolName !== 'Edit' && toolName !== 'MultiEdit' && toolName !== 'Write' && toolName !== 'NotebookEdit' && toolName !== 'exit_plan_mode' && toolName !== 'ExitPlanMode' && (
+                {!isAcp && toolName && toolName !== 'Edit' && toolName !== 'MultiEdit' && toolName !== 'Write' && toolName !== 'NotebookEdit' && toolName !== 'exit_plan_mode' && toolName !== 'ExitPlanMode' && (
                     renderPermissionButton({
                         label: t('claude.permissions.yesForTool'),
                         loading: loadingForSession,
@@ -589,7 +590,7 @@ export const PermissionFooter: React.FC<PermissionFooterProps> = ({ permission, 
                 )}
 
                 {renderPermissionButton({
-                    label: t('claude.permissions.noTellClaude'),
+                    label: isAcp ? 'Deny' : t('claude.permissions.noTellClaude'),
                     loading: loadingButton === 'deny',
                     onPress: handleDeny,
                     disabled: !isPending || loadingButton !== null || loadingAllEdits || loadingBypass || loadingForSession,

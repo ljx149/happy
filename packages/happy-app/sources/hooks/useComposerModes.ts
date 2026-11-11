@@ -8,7 +8,7 @@ import {
     type EffortLevel,
 } from '@/components/modelModeOptions';
 import type { ModelMode, PermissionMode } from '@/components/PermissionModeSelector';
-import { resolveAgentDefaultConfig, retireModelMode } from '@/sync/agentDefaults';
+import { getAgentDefaultOverride, resolveAgentDefaultConfig, retireModelMode } from '@/sync/agentDefaults';
 import { getRigReasoningSelection, isRigMetadata } from '@/sync/rig';
 import { useSetting } from '@/sync/storage';
 import type { Session } from '@/sync/storageTypes';
@@ -37,10 +37,11 @@ export interface ComposerModes {
  */
 export function useComposerModes(session: Session | null | undefined): ComposerModes {
     const metadata = session?.metadata;
-    const flavor = metadata?.flavor;
+    const flavor = metadata?.agentName === 'dsh' ? 'dsh' : metadata?.flavor;
     const cliVersion = metadata?.version;
     const isRig = isRigMetadata(metadata);
     const agentDefaultOverrides = useSetting('agentDefaultOverrides');
+    const explicitDefaults = getAgentDefaultOverride(agentDefaultOverrides, flavor);
     const effectiveAgentDefaults = React.useMemo(() => (
         resolveAgentDefaultConfig(agentDefaultOverrides, flavor, cliVersion)
     ), [agentDefaultOverrides, cliVersion, flavor]);
@@ -77,11 +78,12 @@ export function useComposerModes(session: Session | null | undefined): ComposerM
 
     const modelMode = React.useMemo<ModelMode | null>(() => (
         resolveCurrentOption(availableModels, [
-            sessionModelMode,
-            isRig ? getRigCurrentModelOptionKey(metadata) : effectiveAgentDefaults.modelMode,
-            isRig ? undefined : metadata?.currentModelCode,
+            sessionModelMode === 'default' ? undefined : sessionModelMode,
+            isRig ? undefined : explicitDefaults.modelMode,
+            isRig ? getRigCurrentModelOptionKey(metadata) : metadata?.currentModelCode,
+            isRig ? undefined : effectiveAgentDefaults.modelMode,
         ])
-    ), [availableModels, sessionModelMode, effectiveAgentDefaults.modelMode, metadata, isRig]);
+    ), [availableModels, sessionModelMode, effectiveAgentDefaults.modelMode, metadata, isRig, explicitDefaults.modelMode]);
 
     const modelKey = modelMode?.key ?? 'default';
     const availableEffortLevels = React.useMemo<EffortLevel[]>(() => (
@@ -90,9 +92,11 @@ export function useComposerModes(session: Session | null | undefined): ComposerM
     const effortLevel = React.useMemo<EffortLevel | null>(() => (
         resolveCurrentOption(availableEffortLevels, [
             session?.effortLevel,
-            isRig ? getRigReasoningSelection(metadata, modelKey) : effectiveAgentDefaults.effortLevel,
+            isRig ? undefined : explicitDefaults.effortLevel,
+            isRig ? getRigReasoningSelection(metadata, modelKey) : metadata?.currentThoughtLevelCode,
+            isRig ? undefined : effectiveAgentDefaults.effortLevel,
         ])
-    ), [availableEffortLevels, session?.effortLevel, effectiveAgentDefaults.effortLevel, metadata, modelKey, isRig]);
+    ), [availableEffortLevels, session?.effortLevel, effectiveAgentDefaults.effortLevel, metadata, modelKey, isRig, explicitDefaults.effortLevel]);
 
     return {
         availableModes,

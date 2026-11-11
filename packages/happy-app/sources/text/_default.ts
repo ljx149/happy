@@ -924,7 +924,7 @@ export const en = {
         // First run on phones: create an account, then link a computer from
         // one checklist. The same checklist is the home empty state whenever
         // no computer is reachable.
-        headline: 'Claude, Codex, Grok\nin your pocket',
+        headline: 'Claude Code, Codex, DSH\nin your pocket',
         propEncrypted: 'End-to-end encrypted',
         propNoPassword: 'No email, no password',
         propOpenSource: 'Open source, MIT license',
@@ -937,10 +937,10 @@ export const en = {
         installBodySuffix: '.',
         terminalComment: '# Prefer the terminal?',
         terminalInstall: 'npm install -g https://github.com/ljx149/happy/releases/download/agentport-cli-1.2.9-test.1/agentport-cli-1.2.9.tgz',
-        terminalRun: 'agentport',
+        terminalRun: 'agentport auth login',
         // No-break spaces keep the button name on one line.
-        openStep: 'Open AgentPort and choose Link\u00A0Mobile\u00A0App',
-        openBody: 'It’s the last step of setup on your computer. A QR code appears there.',
+        openStep: 'Run agentport auth login',
+        openBody: 'Open the authorization link shown by the CLI, then run agentport daemon start on your computer.',
         scanStep: 'Scan the QR code',
         scanButton: 'Scan QR code',
         pasteLink: 'Can’t scan QR code? Paste link instead',

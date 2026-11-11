@@ -43,6 +43,10 @@ export const MetadataSchema = z.object({
         thinkingLevels: z.array(z.string()).optional(),
         defaultThinkingLevel: z.string().optional(),
     }).passthrough()).optional(),
+    modelReasoningEfforts: z.record(z.string(), z.array(z.object({ code: z.string(), value: z.string() }))).optional(),
+    modelProvider: z.string().optional(),
+    modelCatalogSource: z.string().optional(),
+    agentName: z.string().optional(),
     currentModelCode: z.string().optional(),
     operatingModes: z.array(z.object({
         code: z.string(),
@@ -506,6 +510,7 @@ export const MachineMetadataSchema = z.object({
     cliAvailability: z.object({
         claude: z.boolean(),
         codex: z.boolean(),
+        dsh: z.boolean().optional(),
         gemini: z.boolean(),
         openclaw: z.boolean(),
         agy: z.boolean().optional(), // optional: older CLIs don't report agy

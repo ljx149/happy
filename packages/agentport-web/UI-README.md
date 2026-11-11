@@ -25,3 +25,7 @@
 发布只更新 AgentPort 自己的静态目录并重启 `agentport.service` 使静态路由重新登记，不修改共享 Nginx、DNS、证书。每次先备份整个静态目录、记录入口文件校验值，并监测已有站点。回滚应恢复备份中被覆盖的静态文件和首页，然后仅重启 AgentPort。
 
 更多原版来源和限制见 `../happy-app/UI-README.md` 和 `../happy-app/AGENTPORT-RESTORE.md`。实际部署状态以发布记录和线上 `SOURCE_COMMIT` 为准。
+
+## 与原版 UI 的适配同步（2026-11-11）
+
+原版 `../happy-app` 已补上 DSH 入口、能力字段、运行时模型/推理强度、沿用电脑配置、HTTPS 配对链接和 ACP 单次审批限制。本目录继续保留，功能差异与验收边界详见 `../happy-app/UI-README.md` 的适配核对表。原版隐藏 thinking，本目录允许折叠查看；不要为了统一外观把 thinking 合并进最终回答。后续涉及协议、模型、审批或身份的修复必须同时核对两套 UI。

@@ -206,34 +206,19 @@ describe('modelModeOptions', () => {
     ])('resolves a saved %s onto the %s row without adding one', (saved, row) => {
         const models = getAvailableModels('claude', null, translate, saved);
 
-        expect(models).toEqual(getClaudeModelModes());
+        expect(models.map(model => model.key)).toEqual(['default', row]);
         expect(models.some((model) => model.key === saved)).toBe(false);
         expect(models.some((model) => model.key === row)).toBe(true);
     });
 
-    it('offers every codex model the levels its own registry publishes', () => {
-        // Straight from Codex's model registry: astra, every sol, and terra publish
-        // ultra, neither luna does. The difference is the whole point of asking
-        // per model rather than per flavor.
-        expect(getEffortLevelsForModel('codex', 'gpt-6-astra').map((level) => level.key))
-            .toEqual(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
-        expect(getEffortLevelsForModel('codex', 'gpt-6.1-sol').map((level) => level.key))
-            .toEqual(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
-        expect(getEffortLevelsForModel('codex', 'gpt-6-sol').map((level) => level.key))
-            .toEqual(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
-        expect(getEffortLevelsForModel('codex', 'gpt-6-luna').map((level) => level.key))
-            .toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
-        expect(getEffortLevelsForModel('codex', 'gpt-5.6-sol').map((level) => level.key))
-            .toEqual(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
-        expect(getEffortLevelsForModel('codex', 'gpt-5.6-terra').map((level) => level.key))
-            .toEqual(['low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
-        expect(getEffortLevelsForModel('codex', 'gpt-5.6-luna').map((level) => level.key))
-            .toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
-    });
-
-    it('falls back to the conservative codex range for an unknown model', () => {
-        const keys = getEffortLevelsForModel('codex', 'my-workspace-model').map((level) => level.key);
-        expect(keys).toEqual(['low', 'medium', 'high', 'xhigh']);
+    it('uses the runtime per-model Codex capability catalog without guessing', () => {
+        const metadata = { currentModelCode: 'custom', modelReasoningEfforts: {
+            custom: [{ code: 'high', value: 'High' }], other: [{ code: 'low', value: 'Low' }],
+        }} as any;
+        expect(getEffortLevelsForModel('codex', 'default', metadata).map(x => x.key)).toEqual(['high']);
+        expect(getEffortLevelsForModel('codex', 'other', metadata).map(x => x.key)).toEqual(['low']);
+        expect(getEffortLevelsForModel('codex', 'unknown', metadata)).toEqual([]);
+        expect(getEffortLevelsForModel('codex', 'gpt-6-astra')).toEqual([]);
     });
 
     it('offers claude the SDK effort union for every model', () => {
@@ -247,17 +232,12 @@ describe('modelModeOptions', () => {
         }
     });
 
-    it('uses code defaults for agent defaults', () => {
-        expect(getDefaultPermissionModeKey('claude')).toBe('auto');
-        expect(getDefaultModelKey('claude')).toBe('claude-opus-5');
-        expect(getDefaultModelKey('claude', '1.2.6-beta.0')).toBe('claude-opus-5-5');
-        expect(getDefaultEffortKey('claude')).toBe('medium');
-        expect(getDefaultPermissionModeKey('codex')).toBe('auto');
-        expect(getDefaultModelKey('codex')).toBe('gpt-6.1-sol');
-        expect(getDefaultEffortKey('codex')).toBe('medium');
-        expect(getDefaultPermissionModeKey('agy')).toBe('default');
-        expect(getDefaultModelKey('agy')).toBe('Gemini 3.8 Flash');
-        expect(getDefaultEffortKey('agy')).toBe('medium');
+    it('inherits the computer model and effort before runtime discovery', () => {
+        for (const agent of ['claude', 'codex', 'dsh']) {
+            expect(getDefaultPermissionModeKey(agent)).toBe('default');
+            expect(getDefaultModelKey(agent)).toBe('default');
+            expect(getDefaultEffortKey(agent)).toBe(null);
+        }
     });
 
     it('prefers metadata models over hardcoded fallbacks', () => {
@@ -425,7 +405,7 @@ describe('modelModeOptions', () => {
             client: { id: 'rig', name: 'Rig', version: '0.9.0' },
         } as any;
 
-        expect(getAvailableModels('codex', metadata, translate)).toEqual(getCodexModelModes());
+        expect(getAvailableModels('codex', metadata, translate).map(x => x.key)).toEqual(['default']);
         expect(getAvailablePermissionModes('codex', metadata, translate).map((mode) => mode.key)).toEqual([
             'auto', 'safe-yolo', 'read-only', 'yolo', 'default',
         ]);

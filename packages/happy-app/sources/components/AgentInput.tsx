@@ -119,7 +119,7 @@ interface AgentInputProps {
     /** Plan quota windows from agent state, for the week stat and its popup. */
     sessionStatusUsageLimits?: UsageLimitsLike | null;
     onFileViewerPress?: () => void;
-    agentType?: 'claude' | 'codex' | 'gemini' | 'openclaw' | 'agy';
+    agentType?: 'claude' | 'dsh' | 'codex' | 'gemini' | 'openclaw' | 'agy';
     onAgentClick?: () => void;
     machineName?: string | null;
     onMachineClick?: () => void;
@@ -1516,6 +1516,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             ) : (
                                 <Pressable
                                     onPress={handleSettingsPress}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('settings.title')}
                                     hitSlop={{ top: 5, bottom: 10, left: 0, right: 0 }}
                                     style={(p) => ({
                                         flexDirection: 'row',
@@ -1559,7 +1561,7 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                                     fontWeight: '600',
                                     ...Typography.default('semiBold'),
                                 }}>
-                                    {props.agentType === 'claude'
+                                    {props.agentType === 'dsh' ? 'DSH' : props.agentType === 'claude'
                                         ? t('agentInput.agent.claude')
                                         : props.agentType === 'codex'
                                             ? t('agentInput.agent.codex')
@@ -2056,6 +2058,8 @@ export const AgentInput = React.memo(React.forwardRef<MultiTextInputHandle, Agen
                             ) : (
                                 <BubblePressable
                                     onPress={handleSettingsPress}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('settings.title')}
                                     hitSlop={6}
                                     style={styles.mobilePermissionButton}
                                     accessibilityRole="button"

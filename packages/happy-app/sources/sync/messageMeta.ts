@@ -3,7 +3,7 @@ import type { Settings } from './settings';
 import type { MessageMeta } from './typesMessageMeta';
 import { resolveSessionState } from './sessionState';
 import { getAgentDefaultOverride, resolveAgentDefaultConfig, retirePermissionMode } from './agentDefaults';
-import { permissionModeSupportedByCli } from '@/components/modelModeOptions';
+import { getEffortLevelsForModel, permissionModeSupportedByCli } from '@/components/modelModeOptions';
 import type { PermissionModeKey } from '@/components/PermissionModeSelector';
 import {
     getRigComposerMode,
@@ -109,7 +109,7 @@ export function resolveMessageModeMeta(
         return meta;
     }
 
-    const flavor = session.metadata?.flavor;
+    const flavor = session.metadata?.agentName === 'dsh' ? 'dsh' : session.metadata?.flavor;
     const agentOverrides = getAgentDefaultOverride(settings?.agentDefaultOverrides, flavor);
     const meta: MessageModeMeta = {};
     // The happy-cli version running this session. A mode key saved before the
@@ -125,12 +125,9 @@ export function resolveMessageModeMeta(
         return mode;
     };
 
-    // Codex and Agy turns always run with a concrete permission, model, and
-    // effort. Send the same effective defaults the composer displays instead
-    // of omitting them: Codex can reset to its launch mode during an abort, and
-    // Agy maps its model + effort pair independently at the provider boundary.
-    // In either case an omitted fallback could execute differently from the UI.
-    if (flavor === 'codex' || flavor === 'agy') {
+    // Agy requires a concrete pair; AgentPort's Codex/DSH runners inherit
+    // their computer configuration unless the user makes an explicit pick.
+    if (flavor === 'agy') {
         const defaults = resolveAgentDefaultConfig(settings?.agentDefaultOverrides, flavor, cliVersion);
         meta.permissionMode = supported(retirePermissionMode(session.permissionMode ?? defaults.permissionMode));
 
@@ -150,12 +147,13 @@ export function resolveMessageModeMeta(
     }
 
     const modelMode = session.modelMode ?? agentOverrides.modelMode;
-    if (modelMode !== undefined) {
-        meta.model = modelMode === 'default' ? null : modelMode;
+    if (modelMode !== undefined && modelMode !== 'default') {
+        meta.model = modelMode;
     }
 
     const effort = session.effortLevel ?? agentOverrides.effortLevel;
-    if (effort !== undefined) {
+    const runtimeEfforts = getEffortLevelsForModel(flavor, modelMode ?? 'default', session.metadata);
+    if (effort !== undefined && (flavor !== 'codex' && flavor !== 'dsh' || runtimeEfforts.some(level => level.key === effort))) {
         meta.effort = effort;
     }
 
