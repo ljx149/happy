@@ -3,7 +3,7 @@ import 'react-native-reanimated';
 import * as React from 'react';
 import { Typography } from '@/constants/Typography';
 import { createHeader, createPlainHeader } from '@/components/navigation/Header';
-import { Platform, TouchableOpacity, Text, View, Image } from 'react-native';
+import { Platform, TouchableOpacity, Text, View } from 'react-native';
 import { isRunningOnMac } from '@/utils/platform';
 import { useUnistyles } from 'react-native-unistyles';
 import { t } from '@/text';
@@ -243,11 +243,6 @@ export default function RootLayout() {
                             >
                                 {t('navigation.whatsNew')}
                             </Text>
-                            <Image
-                                source={require('@/changelog/images/mouse-on-the-phone.webp')}
-                                style={{ width: 40, height: 40 }}
-                                resizeMode="contain"
-                            />
                         </View>
                     ),
                     headerBackTitle: t('common.back'),

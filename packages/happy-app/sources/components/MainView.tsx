@@ -21,7 +21,6 @@ import { HomeDock, MOBILE_HOME_DOCK_CONTENT_INSET } from './HomeDock';
 import { SettingsViewWrapper } from './SettingsViewWrapper';
 import { SessionsListWrapper } from './SessionsListWrapper';
 import { Header } from './navigation/Header';
-import { HeaderLogo } from './HeaderLogo';
 import { VoiceAssistantStatusBar } from './VoiceAssistantStatusBar';
 import { Ionicons } from '@expo/vector-icons';
 import { t } from '@/text';
@@ -372,8 +371,8 @@ export const MainView = React.memo(({ variant }: MainViewProps) => {
                 headerRight={showHeaderRight ? () => (
                     <HeaderRight activeTab={activeTab} />
                 ) : undefined}
-                headerLeft={() => <HeaderLogo />}
-                headerLeftGlass={Platform.OS !== 'web'}
+                headerLeft={() => null}
+                headerLeftGlass={false}
                 headerBackdropAlwaysVisible={Platform.OS !== 'web'}
                 headerBackdropVariant="home"
                 headerShadowVisible={false}

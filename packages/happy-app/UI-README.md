@@ -69,3 +69,7 @@ corepack pnpm --filter agentport-classic-ui build:web
 用户更新日志源是 `AGENTPORT-CHANGELOG.md`，通过 `pnpm changelog:generate` 生成 `sources/changelog/agentport-changelog.json`；`build:web` 自动生成，并以 `expo export --clear` 清理 Metro 缓存，确保内嵌版本与构建提交正确。原上游 `CHANGELOG.md` / `changelog.json` 留作历史，不再作为产品日志源。
 
 DSH CLI 1.2.11 已补齐首条消息标题兜底、ACP 标题和 MCP 命名同步，网页沿用 metadata.summary 显示，不需要为此升级 UI。真实用户 DSH 环境仍需验收。完整开发历程及未完成事项见 [开发记录](../../docs/agentport-development.md)。
+
+### 网页 1.0.2 导航调整（2026-11-11）
+
+主 UI 手机导航仅保留会话和设置，隐藏收件箱入口；移除手机页头装饰 Logo 与更新日志标题旁的小白鼠图片。收件箱底层页面和数据保留；备用精简 UI 不受此显示调整影响。CLI 无需更新。

@@ -8,7 +8,7 @@
 - 主网页：`packages/happy-app`，包名 `agentport-classic-ui`；恢复官方历史 UI 后换牌并补 AgentPort 适配。访问 `https://agent.xcodex.vip/`。
 - 备用网页：`packages/agentport-web`，保留精简 UI 和 `/legacy/index.html#home`；两套 UI 共用 API，但后续登录/退出独立。不要删除旧静态资源或身份数据。
 - CLI：`packages/happy-cli`，包名 `agentport-cli`，命令 `agentport`，最新发布 1.2.11。通过 GitHub release 的 `.tgz` 安装。
-- 网页版本与 CLI 独立：网页从此次 1.0.1 起以 `happy-app/package.json` 为来源，Expo 配置读取它，并记录构建所用 Git SHA 及提交时间。旧版显示的 1.8.0 是上游遗留标识，不能用作 AgentPort 发布依据。
+- 网页版本与 CLI 独立：网页当前版本 1.0.2，自 1.0.1 起以 `happy-app/package.json` 为来源，Expo 配置读取它，并记录构建所用 Git SHA 及提交时间。旧版显示的 1.8.0 是上游遗留标识，不能用作 AgentPort 发布依据。
 - 当前服务配置沿用已有部署。网页更新只发布静态文件并按现有流程重启 AgentPort；不得变更共享 Nginx、DNS、证书、其他服务或数据库。
 
 ## 开发历程
@@ -23,6 +23,8 @@
 | 2026-11-11 | `a82b7ede3`，模型搜索焦点修复 | 前次布局把输入框放进点击关闭容器，产生回归；已用触摸模拟与桌面点击、输入过滤、滚动保焦点验证 |
 | 2026-11-11 | `7c2fe4c8a`，CLI 1.2.11，DSH 自动命名 | 1029 项测试；包外安装、真实加密服务、ACP/MCP 协议测试通过；实际 DSH/模型由用户电脑复验 |
 | 2026-11-11 | 网页 1.0.1，设置页精简、独立更新日志和版本来源（清理 Metro 缓存避免旧版本信息） | 本次交付；保留账户、Agent、更新日志、版本，“报告问题”待官网地址确认 |
+
+| 2026-11-11 | 网页 1.0.2，手机导航精简 | 隐藏收件箱入口；移除手机页头装饰 Logo 和更新日志标题小白鼠；保留收件箱底层页面及数据 |
 
 ## 已完成
 

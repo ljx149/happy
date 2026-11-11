@@ -354,7 +354,6 @@ export const TabBar = React.memo(({ activeTab, onTabPress, inboxBadgeCount = 0 }
         { key: 'settings', icon: require('@/assets/images/brutalist/Brutalism-9.png'), iconName: 'settings-outline', activeIconName: 'settings', label: t('tabs.settings') },
     ], []);
     const webTabs: TabDefinition[] = React.useMemo(() => [
-        { key: 'inbox', icon: require('@/assets/images/brutalist/Brutalism-27.png'), iconName: 'mail-outline', activeIconName: 'mail', label: t('tabs.inbox') },
         { key: 'sessions', icon: require('@/assets/images/brutalist/Brutalism-15.png'), iconName: 'code-slash-outline', activeIconName: 'code-slash', label: t('tabs.sessions') },
         { key: 'settings', icon: require('@/assets/images/brutalist/Brutalism-9.png'), iconName: 'settings-outline', activeIconName: 'settings', label: t('tabs.settings') },
     ], []);
