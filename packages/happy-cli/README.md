@@ -1,7 +1,7 @@
-> **AgentPort CLI 分支**：当前发布版本为 1.2.11，命令为 `agentport`。npm 官方同名 `agentport-cli` 属于其他项目，暂时使用本仓库 GitHub 安装包：
+> **AgentPort CLI 分支**：当前发布版本为 1.2.12，命令为 `agentport`。npm 官方同名 `agentport-cli` 属于其他项目，暂时使用本仓库 GitHub 安装包：
 >
 > ```sh
-> npm install -g https://github.com/ljx149/happy/releases/download/agentport-cli-1.2.11-test.1/agentport-cli-1.2.11.tgz
+> npm install -g https://github.com/ljx149/happy/releases/download/agentport-cli-1.2.12-test.1/agentport-cli-1.2.12.tgz
 > agentport auth login
 > agentport daemon start
 > ```
@@ -171,3 +171,5 @@ yarn workspace happy cli --help
 ## License
 
 MIT
+
+DSH 使用前需按 https://xcodex.vip/connect?editor=deepseek 在实际 ACP profile 配置 `xmodels/Xcoder1.0`；配置后解锁，不强制选择。`agentport auth login` 同时显示手机扫码二维码与配对链接，仍需确认授权。

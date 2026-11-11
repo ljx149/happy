@@ -1,3 +1,5 @@
+import { queryMachineModelCatalog } from './modelCatalog';
+import { DSH_SETUP_MESSAGE } from '@/agent/acp/dshEligibility';
 import fs from 'fs/promises';
 import os from 'os';
 import * as tmp from 'tmp';
@@ -343,6 +345,12 @@ export async function startDaemon(): Promise<void> {
             type: 'error',
             errorMessage: '未在 PATH 中找到 dsh（DeepSeek Harness）。请先安装 @deepseek-ai/dsh 并确保 `dsh` 可执行后重试。',
           };
+        }
+
+        if (agentLabel === 'dsh') {
+          const result = await queryMachineModelCatalog({ agent: 'dsh', directory });
+          if (!result.ok) return { type: 'error', errorMessage: '无法检查 DSH 配置，请确认运行器可用后重试（' + result.error + '）。' };
+          if (!result.dshEligibility?.allowed) return { type: 'error', errorMessage: DSH_SETUP_MESSAGE };
         }
 
         // Build environment variables for session spawning

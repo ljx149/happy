@@ -1,3 +1,4 @@
+import { compareVersionsWithPrerelease, isWellFormedVersion } from '@/utils/versionUtils';
 /**
  * Session operations for remote procedure calls
  * Provides strictly typed functions for all session-related RPC operations
@@ -266,6 +267,12 @@ export async function machineSpawnNewSession(options: SpawnSessionOptions): Prom
     const { machineId, directory, approvedNewDirectoryCreation = false, token, agent, permissionMode, modelMode, effortLevel, clientRequestId, providerId, modelId, effort, happyAgentTarget, resumeClaudeSessionId, resumeCodexThreadId, parentSessionId, forkedFromMessageId, isSideChat } = options;
 
     try {
+        if (agent === 'dsh') {
+            const version = storage.getState().machines[machineId]?.metadata?.happyCliVersion;
+            if (!version || !isWellFormedVersion(version) || compareVersionsWithPrerelease(version, '1.2.12') < 0) {
+                throw new Error('使用 DSH 需要 AgentPort CLI 1.2.12 或更新版本；请升级电脑端 CLI 并重启 daemon。');
+            }
+        }
         if (agent === 'rig' && !clientRequestId) {
             throw new Error('Rig session creation requires a client request ID');
         }

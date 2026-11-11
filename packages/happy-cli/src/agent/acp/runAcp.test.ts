@@ -226,7 +226,18 @@ describe('runAcp', () => {
     });
   });
 
+  it('blocks DSH without the required model before sending a prompt and disposes the runtime', async () => {
+    await expect(runAcp({
+      credentials: { token: 'token', encryption: { type: 'legacy', secret: new Uint8Array(32) } },
+      agentName: 'dsh', command: 'dsh', args: ['--profile', 'acp'],
+    })).rejects.toThrow('xmodels/Xcoder1.0');
+    expect(mocks.backendState.prompts).toEqual([]);
+    expect(mocks.backendState.disposeCalls).toBe(1);
+    expect(mocks.mockSession.sendSessionEvent).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('https://xcodex.vip/connect?editor=deepseek') }));
+  });
+
   it('names DSH from the first prompt and syncs runtime and MCP title updates', async () => {
+    mocks.backendState.startSessionMessages = [{ type: 'event', name: 'models_update', payload: { currentModelId: 'xmodels/Xcoder1.0', availableModels: [{ modelId: 'xmodels/Xcoder1.0', name: 'Xcoder' }] } }];
     let metadata: any = { path: '/tmp', host: 'test' };
     mocks.mockSession.updateMetadata.mockImplementation(handler => { metadata = handler(metadata); });
     const runPromise = runAcp({

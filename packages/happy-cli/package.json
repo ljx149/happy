@@ -1,6 +1,6 @@
 {
   "name": "agentport-cli",
-  "version": "1.2.11",
+  "version": "1.2.12",
   "description": "AgentPort remote coding-agent platform CLI",
   "author": "Kirill Dubovitskiy",
   "license": "MIT",

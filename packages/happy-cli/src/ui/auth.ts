@@ -1,3 +1,4 @@
+import { displayQRCode } from './qrcode';
 import { decodeBase64, encodeBase64 } from "@/api/encryption";
 import { configuration } from "@/configuration";
 import { randomBytes } from "node:crypto";
@@ -53,6 +54,7 @@ async function doWebAuth(keypair: tweetnacl.BoxKeyPair): Promise<Credentials | n
     console.log('\nWeb Authentication\n');
 
     const webUrl = generateWebAuthUrl(keypair.publicKey);
+    displayQRCode(webUrl);
     console.log('Opening your browser...');
 
     const browserOpened = await openBrowser(webUrl);

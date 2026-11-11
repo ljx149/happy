@@ -1,3 +1,4 @@
+import { hasRequiredDshModel, DSH_SETUP_MESSAGE, isDshRuntime } from './dshEligibility';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { ApiClient } from '@/api/api';
@@ -931,9 +932,18 @@ export async function runAcp(opts: {
     await handleAbort();
   });
 
+  const checkDshEligibility = () => {
+    if (!isDshRuntime(opts.agentName, opts.command)) return;
+    const models = modelSelector?.options ?? legacyModels?.availableModels.map(model => ({ code: model.modelId })) ?? [];
+    if (!hasRequiredDshModel(models)) {
+      session.sendSessionEvent({ type: 'message', message: DSH_SETUP_MESSAGE });
+      throw new Error(DSH_SETUP_MESSAGE);
+    }
+  };
   try {
     const started = await backend.startSession();
     acpSessionId = started.sessionId;
+    checkDshEligibility();
     if (verbose) {
       if (!sawSlashCommands) {
         logAcp('muted', `Outgoing slash commands from ${opts.agentName}: not reported yet`);

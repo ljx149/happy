@@ -4,7 +4,7 @@ import { apiSocket } from '@/sync/apiSocket';
 import { MetadataSchema, type Metadata } from '@/sync/storageTypes';
 import { compareVersionsWithPrerelease, isWellFormedVersion } from '@/utils/versionUtils';
 
-const Reply = z.object({ ok: z.literal(true), agent: z.string(), directory: z.string(), fetchedAt: z.number(), catalog: MetadataSchema.pick({
+const Reply = z.object({ dshEligibility: z.object({ allowed: z.boolean() }).optional(), ok: z.literal(true), agent: z.string(), directory: z.string(), fetchedAt: z.number(), catalog: MetadataSchema.pick({
     models: true, currentModelCode: true, modelReasoningEfforts: true, thoughtLevels: true,
     currentThoughtLevelCode: true, modelProvider: true, modelCatalogSource: true,
 }) });
@@ -18,15 +18,15 @@ const errors: Record<string, string> = {
 export function useMachineModelCatalog(machineId: string | undefined, directory: string | null, agent: string, cliVersion: string | undefined, online: boolean) {
     const [attempt, retry] = React.useReducer(n => n + 1, 0);
     const key = JSON.stringify([machineId, directory, agent, cliVersion, online, attempt]);
-    const [state, setState] = React.useState<{ key: string; loading: boolean; metadata?: Metadata; error?: string }>({ key: '', loading: false });
+    const [state, setState] = React.useState<{ key: string; loading: boolean; metadata?: Metadata; error?: string; dshAllowed?: boolean }>({ key: '', loading: false });
     React.useEffect(() => {
         let active = true;
         if (!['claude', 'codex', 'dsh'].includes(agent) || !machineId || !directory) {
             setState({ key, loading: false }); return;
         }
         if (!online) { setState({ key, loading: false, error: '电脑离线，请先启动 agentport daemon。' }); return; }
-        if (!cliVersion || !isWellFormedVersion(cliVersion) || compareVersionsWithPrerelease(cliVersion, '1.2.10') < 0) {
-            setState({ key, loading: false, error: '实时读取需要电脑端 AgentPort CLI 1.2.10 或更新版本；升级后重启 daemon。' }); return;
+        if (!cliVersion || !isWellFormedVersion(cliVersion) || compareVersionsWithPrerelease(cliVersion, agent === 'dsh' ? '1.2.12' : '1.2.10') < 0) {
+            setState({ key, loading: false, error: `请升级电脑端 AgentPort CLI 至 ${agent === 'dsh' ? '1.2.12' : '1.2.10'} 或更新版本，并重启 daemon。` }); return;
         }
         setState({ key, loading: true });
         const timer = setTimeout(async () => {
@@ -38,7 +38,7 @@ export function useMachineModelCatalog(machineId: string | undefined, directory:
                 }
                 const result = Reply.parse(raw);
                 if (result.agent !== agent || result.directory !== directory) throw new Error('Mismatched discovery target');
-                setState({ key, loading: false, metadata: {
+                setState({ key, loading: false, dshAllowed: result.dshEligibility?.allowed, metadata: {
                     ...result.catalog, path: directory, host: '', machineId,
                     flavor: agent === 'dsh' ? 'acp' : agent, agentName: agent, version: cliVersion,
                 } });

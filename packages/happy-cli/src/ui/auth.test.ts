@@ -3,10 +3,12 @@ import nacl from 'tweetnacl';
 
 const mocks = vi.hoisted(() => ({
     post: vi.fn(),
+    qr: vi.fn(),
     openBrowser: vi.fn(),
     writeCredentialsDataKey: vi.fn(),
 }));
 
+vi.mock('./qrcode', () => ({ displayQRCode: mocks.qr }));
 vi.mock('axios', () => ({ default: { post: mocks.post } }));
 vi.mock('@/configuration', () => ({ configuration: {
     serverUrl: 'https://agent.xcodex.vip',
@@ -54,6 +56,7 @@ describe('AgentPort browser authorization', () => {
 
         const url = new URL(mocks.openBrowser.mock.calls[0][0]);
         expect(url.origin + url.pathname).toBe('https://agent.xcodex.vip/terminal/connect');
+        expect(mocks.qr).toHaveBeenCalledWith(url.toString());
         expect(url.hash).toBe('#key=' + Buffer.from(requestKey!).toString('base64url'));
         expect(result?.encryption.type).toBe('dataKey');
         expect(mocks.writeCredentialsDataKey).toHaveBeenCalledWith(expect.objectContaining({

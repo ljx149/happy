@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 const runtime = vi.hoisted(() => ({
   connect: vi.fn(), disconnect: vi.fn(), getModelMetadata: vi.fn(),
   startSession: vi.fn(), dispose: vi.fn(), listener: null as any,
@@ -34,9 +35,29 @@ describe('machine model discovery', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.catalog.currentModelCode).toBe('my-provider/model');
+      expect(result.dshEligibility).toEqual({ allowed: false });
       expect(result.catalog.thoughtLevels).toBeUndefined();
     }
     expect(runtime.dispose).toHaveBeenCalledOnce();
+  });
+  it('recognizes the real DSH ACP provider/model tuple', async () => {
+    runtime.startSession.mockImplementation(async () => {
+      runtime.listener({ type: 'event', name: 'config_options_update', payload: [{ id: 'model', type: 'select', category: 'model', currentValue: '["xmodels","Xcoder1.0"]', options: [{ group: 'xmodels', name: 'Xmodels', options: [{ value: '["xmodels","Xcoder1.0"]', name: 'Xcoder' }] }] }] });
+    });
+    const result = await queryMachineModelCatalog({ agent: 'dsh', directory: tmpdir() });
+    expect(result.ok && result.dshEligibility?.allowed).toBe(true);
+    expect(runtime.dispose).toHaveBeenCalledOnce();
+  });
+  it('prefers config options over a conflicting legacy catalog and supports a new workspace', async () => {
+    runtime.startSession.mockImplementation(async () => {
+      runtime.listener({ type: 'event', name: 'config_options_update', payload: [{ id: 'model', type: 'select', category: 'model', currentValue: '["xmodels","Xcoder1.0"]', options: [{ value: '["xmodels","Xcoder1.0"]', name: 'Xcoder' }] }] });
+      runtime.listener({ type: 'event', name: 'models_update', payload: { currentModelId: 'other', availableModels: [{ modelId: 'other', name: 'Other' }] } });
+    });
+    const directory = join(tmpdir(), 'agentport-not-created-' + Date.now(), 'nested');
+    const result = await queryMachineModelCatalog({ agent: 'dsh', directory });
+    expect(result.ok && result.dshEligibility?.allowed).toBe(true);
+    expect(result.ok && result.directory).toBe(directory);
+    expect(result.ok && result.catalog.models[0].code).toBe('["xmodels","Xcoder1.0"]');
   });
   it('uses only Claude advertised effort levels and closes discovery without a prompt', async () => {
     runtime.supportedModels.mockResolvedValue([{ value: 'custom', displayName: 'Custom', supportsEffort: true, supportedEffortLevels: ['low', 'high'] }]);

@@ -7,8 +7,8 @@
 - 仓库：`ljx149/happy`，工作分支 `main`，本机发布 remote 是 `agentport`；不要推送上游 `slopus/happy`。
 - 主网页：`packages/happy-app`，包名 `agentport-classic-ui`；恢复官方历史 UI 后换牌并补 AgentPort 适配。访问 `https://agent.xcodex.vip/`。
 - 备用网页：`packages/agentport-web`，保留精简 UI 和 `/legacy/index.html#home`；两套 UI 共用 API，但后续登录/退出独立。不要删除旧静态资源或身份数据。
-- CLI：`packages/happy-cli`，包名 `agentport-cli`，命令 `agentport`，最新发布 1.2.11。通过 GitHub release 的 `.tgz` 安装。
-- 网页版本与 CLI 独立：网页当前版本 1.0.2，自 1.0.1 起以 `happy-app/package.json` 为来源，Expo 配置读取它，并记录构建所用 Git SHA 及提交时间。旧版显示的 1.8.0 是上游遗留标识，不能用作 AgentPort 发布依据。
+- CLI：`packages/happy-cli`，包名 `agentport-cli`，命令 `agentport`，最新发布目标 1.2.12。通过 GitHub release 的 `.tgz` 安装。
+- 网页版本与 CLI 独立：网页当前版本 1.0.3，自 1.0.1 起以 `happy-app/package.json` 为来源，Expo 配置读取它，并记录构建所用 Git SHA 及提交时间。旧版显示的 1.8.0 是上游遗留标识，不能用作 AgentPort 发布依据。
 - 当前服务配置沿用已有部署。网页更新只发布静态文件并按现有流程重启 AgentPort；不得变更共享 Nginx、DNS、证书、其他服务或数据库。
 
 ## 开发历程
@@ -24,6 +24,7 @@
 | 2026-11-11 | `7c2fe4c8a`，CLI 1.2.11，DSH 自动命名 | 1029 项测试；包外安装、真实加密服务、ACP/MCP 协议测试通过；实际 DSH/模型由用户电脑复验 |
 | 2026-11-11 | 网页 1.0.1，设置页精简、独立更新日志和版本来源（清理 Metro 缓存避免旧版本信息） | 本次交付；保留账户、Agent、更新日志、版本，“报告问题”待官网地址确认 |
 | 2026-11-11 | 网页 1.0.2，手机导航精简 | 隐藏收件箱入口；移除手机页头装饰 Logo 和更新日志标题小白鼠；保留收件箱底层页面及数据 |
+| 2026-11-11 | 网页 1.0.3 / CLI 1.2.12，DSH 配置门槛与扫码授权 | 按实际 ACP 模型标识检查 xmodels/Xcoder1.0；配置后解锁、不强制选择；二维码复用浏览器配对 URL |
 
 ## 已完成
 
@@ -68,3 +69,12 @@
 - [网页发布记录](../packages/happy-app/AGENTPORT-CHANGELOG.md)
 - [P0 历史计划](plans/agentport-implementation-plan.md)
 - [第二阶段历史计划](plans/agentport-phase2-plan.md)
+
+## DSH 配置门槛与二维码（1.2.12）
+
+- 使用条件：同一电脑与工作目录下，实际 DSH ACP profile 上报 `xmodels/Xcoder1.0`。当前官方 ACP 用 JSON tuple `["xmodels","Xcoder1.0"]`，兼容旧版 provider/model 标识；不匹配显示名称。configOptions 优先于 legacy models。
+- 新目录先在最近存在的父目录读取配置，批准创建目录后 daemon 在目标目录重新检测；运行器启动后再次校验。检测不发送用户 prompt，不调用真实模型。
+- 未通过时网页禁用发送并提供 https://xcodex.vip/connect?editor=deepseek 与重新检测；离线、旧 CLI、读取失败分别提示。所有主 UI DSH 创建入口要求 CLI 1.2.12；旧 CLI 需升级并重启 daemon。已运行的会话不强制中断。
+- 配置存在后允许选择其他模型，不验证 API Key 有效性、余额或推理服务可用性；这是本机产品使用门槛，不是针对用户修改 CLI/自定义包装命令的服务端安全边界。不会修改 DSH 原始配置或上传凭据。
+- `agentport auth login` 在终端本地生成二维码，内容为同一配对 URL（保留 fragment 公钥），仍需手机网页确认。保留原始链接和自动开浏览器；不依赖第三方二维码服务。
+- 自动测试覆盖精确模型身份、冲突目录优先级、未配置拒绝、进程清理、旧 CLI 创建入口与配对 URL 一致性。真实手机相机扫码、用户电脑 DSH 配置与真实推理仍待用户复验。

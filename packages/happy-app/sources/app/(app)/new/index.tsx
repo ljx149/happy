@@ -15,6 +15,7 @@ import {
     NativeSyntheticEvent,
     Image as RNImage,
     Keyboard,
+    Linking,
     useWindowDimensions,
 } from 'react-native';
 import { GlassView } from 'expo-glass-effect';
@@ -1124,6 +1125,7 @@ function NewSessionScreen() {
         selectedChoice?.happyMachine?.id, resolvedSelectedPath, selectedAgent,
         happyCliVersion ?? undefined, !!selectedChoice?.happyMachine && isMachineOnline(selectedChoice.happyMachine),
     );
+    const dshBlocked = selectedAgent === 'dsh' && liveModelCatalog.dshAllowed !== true;
     const reportedModelCatalog = liveModelCatalog.metadata;
     const modelModes = React.useMemo<ModelMode[]>(() => {
         if (rigCreation) return rigCreation.models;
@@ -1484,7 +1486,7 @@ function NewSessionScreen() {
     const handleSend = React.useCallback(async (
         approvedNewDirectoryCreation: boolean = false,
     ) => {
-        if (sendingRef.current) return;
+        if (sendingRef.current || dshBlocked) return;
         const draftState = useNewSessionDraft.getState();
         let ownsCreatedSession = true;
         const isCurrentTarget = () => {
@@ -1752,9 +1754,9 @@ function NewSessionScreen() {
             if (sendingRef.current === controller) sendingRef.current = null;
             if (isMountedRef.current) setIsSpawning(false);
         }
-    }, [agentWorkspaces, allMachines, canPickWorktree, selectedEffortValue, currentModelKey, currentPermission?.key, draftProjectId, effectiveAgentDefaults.effortLevel, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.permissionMode, navigateToSession, picksWorkspaces, router, selectedAgent, selectedMachineId, selectedPath, selectedProjectId, worktreeKey]);
+    }, [dshBlocked, agentWorkspaces, allMachines, canPickWorktree, selectedEffortValue, currentModelKey, currentPermission?.key, draftProjectId, effectiveAgentDefaults.effortLevel, effectiveAgentDefaults.modelMode, effectiveAgentDefaults.permissionMode, navigateToSession, picksWorkspaces, router, selectedAgent, selectedMachineId, selectedPath, selectedProjectId, worktreeKey]);
 
-    const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning;
+    const canSend = selectedMachineId && selectedMachine && isMachineOnline(selectedMachine) && !isSpawning && !dshBlocked;
     React.useEffect(() => {
         if (
             autoSubmit !== '1'
@@ -2084,6 +2086,22 @@ function NewSessionScreen() {
                                             </Text>
                                             <BubblePressable accessibilityRole="button" accessibilityLabel="Refresh models" disabled={liveModelCatalog.loading} onPress={liveModelCatalog.retry}>
                                                 <Text style={{ color: theme.colors.textLink }}>重新读取模型</Text>
+                                            </BubblePressable>
+                                        </View>
+                                    )}
+                                    {selectedAgent === 'dsh' && (
+                                        <View style={{ gap: 8, paddingVertical: 8 }}>
+                                            <Text accessibilityRole={dshBlocked ? 'alert' : undefined} style={{ color: theme.colors.text }}>
+                                                {liveModelCatalog.loading ? '正在检查 DSH 配置…'
+                                                    : liveModelCatalog.error ?? (liveModelCatalog.dshAllowed === false
+                                                        ? '请先配置 DSH 模型：使用 DSH 前，需要在这台电脑的 DSH ACP 配置中添加 xmodels/Xcoder1.0。请按照教程完成配置，然后点击“重新检测”。'
+                                                        : liveModelCatalog.dshAllowed === true ? 'DSH 配置检查通过，可以创建对话。' : '请选择在线电脑和工作目录，并确认 CLI 已更新。')}
+                                            </Text>
+                                            <BubblePressable accessibilityRole="link" onPress={() => void Linking.openURL('https://xcodex.vip/connect?editor=deepseek')}>
+                                                <Text style={{ color: theme.colors.textLink }}>查看配置教程</Text>
+                                            </BubblePressable>
+                                            <BubblePressable accessibilityRole="button" disabled={liveModelCatalog.loading} onPress={liveModelCatalog.retry}>
+                                                <Text style={{ color: theme.colors.textLink }}>已配置，重新检测</Text>
                                             </BubblePressable>
                                         </View>
                                     )}
