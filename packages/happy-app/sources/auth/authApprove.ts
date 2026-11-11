@@ -28,29 +28,18 @@ export async function authApprove(token: string, publicKey: Uint8Array, answerV1
     
     const { status, supportsV2 } = statusResponse.data;
     
-    // Handle different status cases
     if (status === 'not_found') {
-        // Already authorized, no need to approve again
-        console.log('Auth request already authorized or not found');
-        return;
+        throw new Error('配对请求已失效，请在电脑上重新运行 agentport auth login。');
     }
-    
-    if (status === 'authorized') {
-        // Already authorized, no need to approve again
-        console.log('Auth request already authorized');
-        return;
-    }
-    
-    // Handle pending status
-    if (status === 'pending') {
-        await axios.post(`${API_ENDPOINT}/v1/auth/response`, {
-            publicKey: publicKeyBase64,
-            response: supportsV2 ? encodeBase64(answerV2) : encodeBase64(answerV1)
-        }, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'X-Happy-Client': getHappyClientId(),
-            }
-        });
-    }
+    // Even an already authorized request must be checked against this account.
+    // The server makes same-account retries idempotent and rejects another owner.
+    await axios.post(`${API_ENDPOINT}/v1/auth/response`, {
+        publicKey: publicKeyBase64,
+        response: supportsV2 ? encodeBase64(answerV2) : encodeBase64(answerV1)
+    }, {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'X-Happy-Client': getHappyClientId(),
+        }
+    });
 }

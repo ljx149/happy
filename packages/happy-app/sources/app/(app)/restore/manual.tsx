@@ -1,3 +1,4 @@
+import { restoreDestination } from '@/auth/pendingTerminal';
 import React, { useState } from 'react';
 import { Platform, View, Text, TextInput, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -87,7 +88,7 @@ export default function Restore() {
 
             // Straight home. A plain back() landed on the QR restore screen
             // underneath, which then restarted its own pairing.
-            router.dismissTo('/');
+            router.dismissTo(restoreDestination());
 
         } catch (error) {
             console.error('Restore error:', error);

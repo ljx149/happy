@@ -1,3 +1,4 @@
+import { singleInitialization } from './initialization';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import { apiSocket, getCurrentAppState, getHappyClientId } from '@/sync/apiSocket';
@@ -3296,23 +3297,13 @@ export const sync = new Sync();
 // Init sequence
 //
 
-let isInitialized = false;
-export async function syncCreate(credentials: AuthCredentials) {
-    if (isInitialized) {
-        console.warn('Sync already initialized: ignoring');
-        return;
-    }
-    isInitialized = true;
-    await syncInit(credentials, false);
+const initializeOnce = singleInitialization();
+export function syncCreate(credentials: AuthCredentials): Promise<void> {
+    return initializeOnce(() => syncInit(credentials, false));
 }
 
-export async function syncRestore(credentials: AuthCredentials) {
-    if (isInitialized) {
-        console.warn('Sync already initialized: ignoring');
-        return;
-    }
-    isInitialized = true;
-    await syncInit(credentials, true);
+export function syncRestore(credentials: AuthCredentials): Promise<void> {
+    return initializeOnce(() => syncInit(credentials, true));
 }
 
 async function syncInit(credentials: AuthCredentials, restore: boolean) {

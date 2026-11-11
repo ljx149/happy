@@ -1,4 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/auth/AuthContext';
+import { authGetToken } from '@/auth/authGetToken';
+import { getRandomBytesAsync } from 'expo-crypto';
+import { encodeBase64 } from '@/encryption/base64';
+import { createTerminalAccountFlow } from '@/auth/terminalAccount';
+import { rememberTerminal, pendingTerminal, forgetTerminal } from '@/auth/pendingTerminal';
+import { Modal } from '@/modal';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Platform } from 'react-native';
 import { Text } from '@/components/StyledText';
 import { useRouter } from 'expo-router';
@@ -13,11 +20,24 @@ import { t } from '@/text';
 
 export default function TerminalConnectScreen() {
     const router = useRouter();
+    const auth = useAuth();
+    const [creatingAccount, setCreatingAccount] = useState(false);
+    const connecting = useRef(false);
+    const accountFlow = useRef(createTerminalAccountFlow({
+        create: async () => {
+            const secret = await getRandomBytesAsync(32);
+            const token = await authGetToken(secret);
+            if (typeof token !== 'string' || !token) throw new Error('账户创建失败，请重试。');
+            return { token, secret: encodeBase64(secret, 'base64url') };
+        },
+        login: auth.login,
+    }));
     const [publicKey, setPublicKey] = useState<string | null>(null);
     const [hashProcessed, setHashProcessed] = useState(false);
     const { processAuthUrl, isLoading } = useConnectTerminal({
         onSuccess: () => {
-            router.back();
+            forgetTerminal();
+            router.replace('/');
         }
     });
 
@@ -25,29 +45,39 @@ export default function TerminalConnectScreen() {
     useEffect(() => {
         if (Platform.OS === 'web' && typeof window !== 'undefined' && !hashProcessed) {
             const hash = window.location.hash;
-            if (hash.startsWith('#key=')) {
-                const key = hash.substring(5); // Remove '#key='
+            const key = hash ? new URLSearchParams(hash.slice(1)).get('key') : pendingTerminal();
+            if (key && /^[A-Za-z0-9_-]{43}$/.test(key)) {
                 setPublicKey(key);
-                
-                // Clear the hash from URL to prevent exposure in browser history
-                window.history.replaceState(null, '', window.location.pathname + window.location.search);
-                setHashProcessed(true);
-            } else {
-                setHashProcessed(true);
+                try {
+                    rememberTerminal(key);
+                    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                } catch { /* Keep the URL when session storage is unavailable. */ }
             }
+            setHashProcessed(true);
         }
     }, [hashProcessed]);
 
     const handleConnect = async () => {
-        if (publicKey) {
-            // Convert the hash key format to the expected happy:// URL format
-            const authUrl = `happy://terminal?${publicKey}`;
-            await processAuthUrl(authUrl);
+        if (!publicKey || connecting.current) return;
+        connecting.current = true;
+        setCreatingAccount(true);
+        try {
+            const credentials = await accountFlow.current(auth.credentials);
+            await processAuthUrl(`happy://terminal?${publicKey}`, credentials);
+        } catch {
+            Modal.alert('无法完成账户初始化', '未连接电脑。请确认浏览器允许保存网站数据，然后刷新页面重试；已保存的账户和待连接请求会保留。', [
+                { text: '取消' },
+                { text: '刷新后重试', onPress: () => { if (Platform.OS === 'web') window.location.reload(); } },
+            ]);
+        } finally {
+            connecting.current = false;
+            setCreatingAccount(false);
         }
     };
-
+    const busy = isLoading || creatingAccount;
     const handleReject = () => {
-        router.back();
+        forgetTerminal();
+        router.replace('/');
     };
 
     // Show placeholder for mobile platforms
@@ -207,19 +237,27 @@ export default function TerminalConnectScreen() {
                     paddingVertical: 16,
                     gap: 12 
                 }}>
+                    {!auth.isAuthenticated && (
+                        <>
+                            <Text style={{ ...Typography.default(), textAlign: 'center', marginBottom: 8 }}>
+                                将在当前浏览器创建账户并连接电脑。已有账户？请先恢复账户，以继续使用原有设备和会话。
+                            </Text>
+                            <RoundButton title="恢复已有账户" onPress={() => router.push('/restore')} display="inverted" disabled={busy} />
+                        </>
+                    )}
                     <RoundButton
-                        title={isLoading ? t('terminal.connecting') : t('terminal.acceptConnection')}
+                        title={busy ? t('terminal.connecting') : auth.isAuthenticated ? t('terminal.acceptConnection') : '创建账户并连接'}
                         onPress={handleConnect}
                         size="large"
-                        disabled={isLoading}
-                        loading={isLoading}
+                        disabled={busy}
+                        loading={busy}
                     />
                     <RoundButton
                         title={t('terminal.reject')}
                         onPress={handleReject}
                         size="large"
                         display="inverted"
-                        disabled={isLoading}
+                        disabled={busy}
                     />
                 </View>
             </ItemGroup>

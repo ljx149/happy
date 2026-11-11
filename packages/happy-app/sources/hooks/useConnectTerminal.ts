@@ -1,3 +1,4 @@
+import type { AuthCredentials } from '@/auth/tokenStorage';
 import * as React from 'react';
 import { terminalAuthKey } from '@/auth/terminalAuthLink';
 import { getServerUrl } from '@/sync/serverConfig';
@@ -23,7 +24,7 @@ export function useConnectTerminal(options?: UseConnectTerminalOptions) {
     const [isLoading, setIsLoading] = React.useState(false);
     const checkScannerPermissions = useCheckScannerPermissions();
 
-    const processAuthUrl = React.useCallback(async (url: string) => {
+    const processAuthUrl = React.useCallback(async (url: string, credentialsOverride?: AuthCredentials) => {
         const tail = terminalAuthKey(url, getServerUrl());
         if (!tail) {
             Modal.alert(t('common.error'), t('modals.invalidAuthUrl'), [{ text: t('common.ok') }]);
@@ -32,13 +33,15 @@ export function useConnectTerminal(options?: UseConnectTerminalOptions) {
         
         setIsLoading(true);
         try {
+            const credentials = credentialsOverride ?? auth.credentials;
+            if (!credentials) throw new Error('请先创建或恢复账户，再连接电脑。');
             const publicKey = decodeBase64(tail, 'base64url');
-            const responseV1 = encryptBox(decodeBase64(auth.credentials!.secret, 'base64url'), publicKey);
+            const responseV1 = encryptBox(decodeBase64(credentials.secret, 'base64url'), publicKey);
             let responseV2Bundle = new Uint8Array(sync.encryption.contentDataKey.length + 1);
             responseV2Bundle[0] = 0;
             responseV2Bundle.set(sync.encryption.contentDataKey, 1);
             const responseV2 = encryptBox(responseV2Bundle, publicKey);
-            await authApprove(auth.credentials!.token, publicKey, responseV1, responseV2);
+            await authApprove(credentials.token, publicKey, responseV1, responseV2);
 
             // People expect a scan to work, so success is felt, not announced:
             // the machine turns up in the list. Only a failure gets an alert.

@@ -1,3 +1,4 @@
+import { restoreDestination } from '@/auth/pendingTerminal';
 import React, { useState, useEffect, useRef } from 'react';
 import { Platform, View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -105,7 +106,7 @@ export default function Restore() {
                         // Straight home: the home route now renders the
                         // signed-in state, and there is no restore screen to
                         // return to.
-                        router.dismissTo('/');
+                        router.dismissTo(restoreDestination());
                     }
                 } else if (!isCancelledRef.current) {
                     Modal.alert(t('common.error'), t('errors.authenticationFailed'));
